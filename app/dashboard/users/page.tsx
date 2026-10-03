@@ -39,7 +39,7 @@ export default function UsersPage() {
   }
 
   async function handleToggleActive(userId: number, currentActive: boolean) {
-    if (!confirm(currentActive ? 'تعطيل هذا المستخدم؟' : 'تفعيل هذا المستخدم؟')) return
+    if (!confirm(currentActive ? 'إيقاف مؤقت لهذا المستخدم؟' : 'تفعيل هذا المستخدم؟')) return
 
     try {
       await fetch('/api/admin/users', {
@@ -53,6 +53,29 @@ export default function UsersPage() {
       loadUsers()
     } catch (e) {
       alert('فشل')
+    }
+  }
+
+  async function handleDelete(id: number, username: string) {
+    if (
+      !confirm(
+        `🗑️ هل أنت متأكد من حذف "${username}"؟\n\nسيتم تعطيل حسابه.\nعند تسجيل الدخول سيرى رسالة "تم الحذف من قبل المطور" مع رابط تيليجرام للتواصل.`
+      )
+    )
+      return
+
+    try {
+      const res = await fetch(`/api/admin/users?id=${id}`, {
+        method: 'DELETE',
+      })
+      const data = await res.json()
+      if (data.success) {
+        loadUsers()
+      } else {
+        alert('❌ ' + (data.message || 'فشل'))
+      }
+    } catch (e: any) {
+      alert('❌ ' + e.message)
     }
   }
 
@@ -190,7 +213,7 @@ export default function UsersPage() {
                             border: 'none',
                             color: '#66bb6a',
                             cursor: 'pointer',
-                            fontSize: '16px',
+                            fontSize: '18px',
                             padding: '4px 6px'
                           }}
                           title="تعديل الرصيد"
@@ -200,13 +223,25 @@ export default function UsersPage() {
                           style={{
                             background: 'transparent',
                             border: 'none',
-                            color: u.is_active ? '#ef5350' : '#66bb6a',
+                            color: u.is_active ? '#ffa726' : '#66bb6a',
                             cursor: 'pointer',
-                            fontSize: '16px',
+                            fontSize: '18px',
                             padding: '4px 6px'
                           }}
-                          title={u.is_active ? 'تعطيل' : 'تفعيل'}
-                        >{u.is_active ? '🚫' : '✅'}</button>
+                          title={u.is_active ? 'إيقاف مؤقت' : 'تفعيل'}
+                        >{u.is_active ? '⏸️' : '▶️'}</button>
+                        <button
+                          onClick={() => handleDelete(u.id, u.username)}
+                          style={{
+                            background: 'transparent',
+                            border: 'none',
+                            color: '#e57373',
+                            cursor: 'pointer',
+                            fontSize: '18px',
+                            padding: '4px 6px'
+                          }}
+                          title="حذف الحساب"
+                        >🗑️</button>
                       </td>
                     </tr>
                   ))}
