@@ -29,6 +29,11 @@ export default function LoginPage() {
         localStorage.setItem('panel_balance', String(data.balance || 0))
         window.location.href = '/dashboard'
       } else {
+        // إذا كان معطل
+        if (data.banned) {
+          window.location.href = '/dashboard/banned'
+          return
+        }
         setError(data.message || 'بيانات الدخول غير صحيحة')
       }
     } catch (err) {
@@ -39,20 +44,23 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="royal-bg" style={{
+    <main style={{
       minHeight: '100vh',
+      background: '#050505',
+      backgroundImage: 'radial-gradient(ellipse at top left, rgba(212,175,55,.08) 0%, transparent 45%), radial-gradient(ellipse at bottom right, rgba(212,175,55,.08) 0%, transparent 45%)',
+      color: '#e8e8e8',
       display: 'flex',
       justifyContent: 'center',
       alignItems: 'center',
       padding: '20px'
     }}>
       <div style={{
-        maxWidth: '440px',
+        maxWidth: '460px',
         width: '100%',
         background: 'linear-gradient(145deg, #0f0f0f, #1a1a1a)',
         border: '2px solid #d4af37',
         borderRadius: '24px',
-        padding: '50px 40px 40px',
+        padding: '50px 40px 35px',
         position: 'relative',
         boxShadow: '0 25px 80px rgba(0,0,0,0.9), 0 0 80px rgba(212,175,55,0.15)'
       }}>
@@ -64,7 +72,6 @@ export default function LoginPage() {
         }}>👑</div>
 
         <h1 style={{
-          fontFamily: 'Georgia, serif',
           fontWeight: 900,
           textAlign: 'center',
           fontSize: '28px',
@@ -126,8 +133,18 @@ export default function LoginPage() {
             onChange={(e) => setUsername(e.target.value)}
             placeholder="أدخل اسم المستخدم"
             required
-            className="input"
-            style={{ marginBottom: '20px' }}
+            style={{
+              width: '100%',
+              padding: '14px',
+              background: '#0a0a0a',
+              border: '1px solid rgba(212,175,55,0.3)',
+              borderRadius: '10px',
+              color: '#e8e8e8',
+              fontSize: '15px',
+              marginBottom: '20px',
+              boxSizing: 'border-box',
+              outline: 'none'
+            }}
           />
 
           <label style={{
@@ -143,27 +160,42 @@ export default function LoginPage() {
             onChange={(e) => setPassword(e.target.value)}
             placeholder="أدخل كلمة المرور"
             required
-            className="input"
-            style={{ marginBottom: '25px' }}
+            style={{
+              width: '100%',
+              padding: '14px',
+              background: '#0a0a0a',
+              border: '1px solid rgba(212,175,55,0.3)',
+              borderRadius: '10px',
+              color: '#e8e8e8',
+              fontSize: '15px',
+              marginBottom: '25px',
+              boxSizing: 'border-box',
+              outline: 'none'
+            }}
           />
 
           <button
             type="submit"
             disabled={loading}
-            className="btn-gold"
             style={{
               width: '100%',
               padding: '16px',
+              background: 'linear-gradient(135deg, #d4af37, #f4d03f)',
+              color: '#0a0a0a',
+              border: 'none',
+              borderRadius: '10px',
               fontSize: '15px',
+              fontWeight: 900,
               letterSpacing: '3px',
-              opacity: loading ? 0.6 : 1,
-              cursor: loading ? 'wait' : 'pointer'
+              cursor: loading ? 'wait' : 'pointer',
+              opacity: loading ? 0.6 : 1
             }}
           >
             {loading ? '... جاري الدخول' : '✦ تسجيل الدخول ✦'}
           </button>
         </form>
 
+        {/* Register Link */}
         <div style={{
           textAlign: 'center',
           marginTop: '25px',
@@ -192,11 +224,51 @@ export default function LoginPage() {
           </a>
         </div>
 
+        {/* Telegram Contact */}
+        <div style={{
+          textAlign: 'center',
+          marginTop: '25px',
+          paddingTop: '20px',
+          borderTop: '1px solid rgba(212,175,55,0.15)'
+        }}>
+          <p style={{ color: '#777', fontSize: '11px', marginBottom: '12px', letterSpacing: '1px' }}>
+            للتجديد والاستفسارات
+          </p>
+
+          <a
+            href="https://t.me/op_mf"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '10px',
+              width: '100%',
+              padding: '14px',
+              background: 'linear-gradient(135deg, #0088cc, #2196F3)',
+              color: '#fff',
+              textDecoration: 'none',
+              borderRadius: '12px',
+              fontWeight: 700,
+              fontSize: '14px',
+              letterSpacing: '1px',
+              boxShadow: '0 5px 20px rgba(33,150,243,0.3)',
+              boxSizing: 'border-box'
+            }}
+          >
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M9.78 18.65l.28-4.23 7.68-6.92c.34-.31-.07-.46-.52-.19L7.74 13.3 3.64 12c-.88-.25-.89-.86.2-1.3l15.97-6.16c.73-.33 1.43.18 1.15 1.3l-2.72 12.81c-.19.91-.74 1.13-1.5.71L12.6 16.3l-1.99 1.93c-.23.23-.42.42-.83.42z"/>
+            </svg>
+            @op_mf
+          </a>
+        </div>
+
         <p style={{
           textAlign: 'center',
           color: '#555',
           fontSize: '10px',
-          marginTop: '25px',
+          marginTop: '20px',
           letterSpacing: '4px'
         }}>SECURE ACCESS · MMXXVI</p>
       </div>
