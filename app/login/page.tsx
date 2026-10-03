@@ -29,7 +29,6 @@ export default function LoginPage() {
         localStorage.setItem('panel_balance', String(data.balance || 0))
         window.location.href = '/dashboard'
       } else {
-        // إذا كان معطل
         if (data.banned) {
           window.location.href = '/dashboard/banned'
           return
@@ -195,10 +194,31 @@ export default function LoginPage() {
           </button>
         </form>
 
+        {/* Distributors Link */}
+        <div style={{
+          textAlign: 'center',
+          marginTop: '20px'
+        }}>
+          <a
+            href="/distributors"
+            style={{
+              display: 'inline-block',
+              padding: '10px 20px',
+              color: '#64B5F6',
+              textDecoration: 'none',
+              fontSize: '13px',
+              letterSpacing: '1px',
+              fontWeight: 700
+            }}
+          >
+            🎯 قائمة الموزعين
+          </a>
+        </div>
+
         {/* Register Link */}
         <div style={{
           textAlign: 'center',
-          marginTop: '25px',
+          marginTop: '20px',
           paddingTop: '20px',
           borderTop: '1px solid rgba(212,175,55,0.2)'
         }}>
