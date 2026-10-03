@@ -5,6 +5,7 @@ import { useState } from 'react'
 interface ActionsProps {
   licenseId: number
   isBanned: boolean
+  isActive: boolean
   onRefresh: () => void
 }
 
@@ -20,7 +21,7 @@ const PRESETS = [
   { value: 'forever', label: '♾️ دائم' },
 ]
 
-export default function Actions({ licenseId, isBanned, onRefresh }: ActionsProps) {
+export default function Actions({ licenseId, isBanned, isActive, onRefresh }: ActionsProps) {
   const [showBan, setShowBan] = useState(false)
   const [showRenew, setShowRenew] = useState(false)
   const [showDelete, setShowDelete] = useState(false)
@@ -60,6 +61,21 @@ export default function Actions({ licenseId, isBanned, onRefresh }: ActionsProps
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ license_id: licenseId, action: 'unban' }),
+      })
+      const data = await res.json()
+      if (data.success) onRefresh()
+    } catch (e) {}
+    setLoading(false)
+  }
+
+  async function handleSuspend(action: 'suspend' | 'activate') {
+    if (action === 'suspend' && !confirm('إيقاف هذا المفتاح مؤقتاً؟ (لن تُرجع الفلوس)')) return
+    setLoading(true)
+    try {
+      const res = await fetch('/api/license/suspend', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ license_id: licenseId, action }),
       })
       const data = await res.json()
       if (data.success) onRefresh()
@@ -112,12 +128,12 @@ export default function Actions({ licenseId, isBanned, onRefresh }: ActionsProps
   }
 
   const btnStyle: any = {
-    fontSize: '18px',
-    padding: '6px 8px',
+    fontSize: '16px',
+    padding: '5px 7px',
     background: 'transparent',
     border: 'none',
     cursor: 'pointer',
-    margin: '0 2px',
+    margin: '0 1px',
     borderRadius: '6px',
   }
 
@@ -155,7 +171,13 @@ export default function Actions({ licenseId, isBanned, onRefresh }: ActionsProps
   }
 
   return (
-    <div style={{ display: 'flex', gap: '2px', justifyContent: 'flex-start', whiteSpace: 'nowrap' }}>
+    <div style={{
+      display: 'flex',
+      gap: '1px',
+      justifyContent: 'flex-start',
+      whiteSpace: 'nowrap',
+    }}>
+      {/* 1. Ban/Unban */}
       {isBanned ? (
         <button
           onClick={handleUnban}
@@ -168,10 +190,30 @@ export default function Actions({ licenseId, isBanned, onRefresh }: ActionsProps
           onClick={() => setShowBan(true)}
           disabled={loading}
           style={{ ...btnStyle, color: '#ef5350' }}
-          title="حظر"
+          title="بنّد (حظر نهائي)"
         >🚫</button>
       )}
 
+      {/* 2. Suspend/Activate */}
+      {!isBanned && (
+        isActive ? (
+          <button
+            onClick={() => handleSuspend('suspend')}
+            disabled={loading}
+            style={{ ...btnStyle, color: '#ffa726' }}
+            title="إيقاف مؤقت"
+          >⏸️</button>
+        ) : (
+          <button
+            onClick={() => handleSuspend('activate')}
+            disabled={loading}
+            style={{ ...btnStyle, color: '#66bb6a' }}
+            title="تفعيل"
+          >▶️</button>
+        )
+      )}
+
+      {/* 3. Renew */}
       <button
         onClick={() => setShowRenew(true)}
         disabled={loading}
@@ -179,20 +221,32 @@ export default function Actions({ licenseId, isBanned, onRefresh }: ActionsProps
         title="تجديد"
       >♻️</button>
 
+      {/* 4. Delete */}
       <button
         onClick={() => setShowDelete(true)}
         disabled={loading}
         style={{ ...btnStyle, color: '#e57373' }}
-        title="حذف"
+        title="حذف (بدون استرجاع)"
       >🗑️</button>
 
       {/* Ban Modal */}
       {showBan && (
         <div style={modalStyle} onClick={() => setShowBan(false)}>
           <div style={boxStyle} onClick={e => e.stopPropagation()}>
-            <h3 style={{ color: '#ef5350', textAlign: 'center', marginBottom: '20px' }}>
-              🚫 حظر المفتاح
+            <h3 style={{ color: '#ef5350', textAlign: 'center', marginBottom: '15px' }}>
+              🚫 بنّد المفتاح
             </h3>
+
+            <p style={{
+              color: '#ffab91',
+              fontSize: '12px',
+              textAlign: 'center',
+              marginBottom: '20px',
+              lineHeight: 1.8
+            }}>
+              ⚠️ المفتاح يُحظر نهائياً.<br />
+              <strong style={{ color: '#ef5350' }}>لن تُرجع الفلوس للموزع.</strong>
+            </p>
 
             {error && (
               <div style={{
@@ -207,7 +261,7 @@ export default function Actions({ licenseId, isBanned, onRefresh }: ActionsProps
             )}
 
             <label style={{ display: 'block', color: '#d4af37', fontSize: '12px', marginBottom: '8px' }}>
-              سبب الحظر (اختياري)
+              سبب البند (اختياري)
             </label>
             <input
               type="text"
@@ -232,8 +286,7 @@ export default function Actions({ licenseId, isBanned, onRefresh }: ActionsProps
                   cursor: loading ? 'wait' : 'pointer',
                   opacity: loading ? 0.6 : 1
                 }}
-              >{loading ? '...' : 'تأكيد'}</button>
-
+              >{loading ? '...' : 'بنّد'}</button>
               <button
                 onClick={() => setShowBan(false)}
                 style={{
@@ -286,7 +339,7 @@ export default function Actions({ licenseId, isBanned, onRefresh }: ActionsProps
             </select>
 
             <p style={{ color: '#888', fontSize: '11px', textAlign: 'center', marginBottom: '15px' }}>
-              💡 يُضاف للمدة الحالية (أو يبدأ من اليوم إذا منتهي)
+              💡 يُضاف للمدة الحالية
             </p>
 
             <div style={{ display: 'flex', gap: '10px' }}>
@@ -304,8 +357,7 @@ export default function Actions({ licenseId, isBanned, onRefresh }: ActionsProps
                   cursor: loading ? 'wait' : 'pointer',
                   opacity: loading ? 0.6 : 1
                 }}
-              >{loading ? '...' : 'تأكيد التجديد'}</button>
-
+              >{loading ? '...' : 'تجديد'}</button>
               <button
                 onClick={() => setShowRenew(false)}
                 style={{
@@ -328,9 +380,20 @@ export default function Actions({ licenseId, isBanned, onRefresh }: ActionsProps
       {showDelete && (
         <div style={modalStyle} onClick={() => setShowDelete(false)}>
           <div style={boxStyle} onClick={e => e.stopPropagation()}>
-            <h3 style={{ color: '#ef5350', textAlign: 'center', marginBottom: '20px' }}>
+            <h3 style={{ color: '#ef5350', textAlign: 'center', marginBottom: '15px' }}>
               🗑️ حذف المفتاح
             </h3>
+
+            <p style={{
+              color: '#ffab91',
+              textAlign: 'center',
+              marginBottom: '20px',
+              lineHeight: 1.8,
+              fontSize: '13px'
+            }}>
+              ⚠️ حذف نهائي لا يمكن التراجع عنه.<br />
+              <strong style={{ color: '#ef5350' }}>لن تُرجع الفلوس للموزع.</strong>
+            </p>
 
             {error && (
               <div style={{
@@ -343,10 +406,6 @@ export default function Actions({ licenseId, isBanned, onRefresh }: ActionsProps
                 fontSize: '13px'
               }}>⚠️ {error}</div>
             )}
-
-            <p style={{ color: '#ffab91', textAlign: 'center', marginBottom: '20px' }}>
-              ⚠️ هل أنت متأكد؟ لا يمكن التراجع!
-            </p>
 
             <div style={{ display: 'flex', gap: '10px' }}>
               <button
@@ -364,7 +423,6 @@ export default function Actions({ licenseId, isBanned, onRefresh }: ActionsProps
                   opacity: loading ? 0.6 : 1
                 }}
               >{loading ? '...' : 'نعم، احذف'}</button>
-
               <button
                 onClick={() => setShowDelete(false)}
                 style={{
