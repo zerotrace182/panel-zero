@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import Actions from '../actions'
 
 export default function AdminDashboardPage() {
   const [licenses, setLicenses] = useState<any[]>([])
@@ -42,14 +43,16 @@ export default function AdminDashboardPage() {
     setLoading(false)
   }
 
+  function refresh() {
+    loadAll()
+  }
+
   function filterLicenses(currentTab: 'my-keys' | 'distributor-keys' | 'banned') {
     if (currentTab === 'banned') {
       setLicenses(allLicenses.filter(l => l.is_banned))
     } else if (currentTab === 'my-keys') {
-      // مفاتيح الأدمن: created_by_user = null
       setLicenses(allLicenses.filter(l => !l.created_by_user && !l.is_banned))
     } else {
-      // مفاتيح الموزعين: created_by_user != null
       setLicenses(allLicenses.filter(l => l.created_by_user && !l.is_banned))
     }
   }
@@ -213,6 +216,30 @@ export default function AdminDashboardPage() {
             fontSize: '14px'
           }}>💵 الأسعار</a>
 
+          <a href="/dashboard/admin/device-prices" style={{
+            display: 'inline-block',
+            padding: '14px 26px',
+            background: 'transparent',
+            color: '#d4af37',
+            border: '1px solid rgba(212,175,55,0.6)',
+            textDecoration: 'none',
+            borderRadius: '10px',
+            fontWeight: 700,
+            fontSize: '14px'
+          }}>💻 أسعار الأجهزة</a>
+
+          <a href="/dashboard/admin/distributors" style={{
+            display: 'inline-block',
+            padding: '14px 26px',
+            background: 'transparent',
+            color: '#d4af37',
+            border: '1px solid rgba(212,175,55,0.6)',
+            textDecoration: 'none',
+            borderRadius: '10px',
+            fontWeight: 700,
+            fontSize: '14px'
+          }}>🎯 الموزعين</a>
+
           <a href="/dashboard/activity" style={{
             display: 'inline-block',
             padding: '14px 26px',
@@ -336,6 +363,7 @@ export default function AdminDashboardPage() {
                     <th style={{ background: 'rgba(212,175,55,0.1)', color: '#f4d03f', padding: '14px 10px', textAlign: 'right', fontSize: '11px' }}>EXPIRES</th>
                     <th style={{ background: 'rgba(212,175,55,0.1)', color: '#f4d03f', padding: '14px 10px', textAlign: 'right', fontSize: '11px' }}>DEVICES</th>
                     <th style={{ background: 'rgba(212,175,55,0.1)', color: '#f4d03f', padding: '14px 10px', textAlign: 'right', fontSize: '11px' }}>STATUS</th>
+                    <th style={{ background: 'rgba(212,175,55,0.1)', color: '#f4d03f', padding: '14px 10px', textAlign: 'right', fontSize: '11px' }}>ACTIONS</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -362,6 +390,14 @@ export default function AdminDashboardPage() {
                           color: l.is_banned ? '#ef5350' : (isActive ? '#66bb6a' : '#ffa726')
                         }}>
                           {l.is_banned ? '🚫 محظور' : (isActive ? '✅ نشط' : '⏰ منتهي')}
+                        </td>
+                        <td style={{ padding: '8px 6px', whiteSpace: 'nowrap' }}>
+                          <Actions
+                            licenseId={l.id}
+                            isBanned={!!l.is_banned}
+                            isActive={!!l.is_active}
+                            onRefresh={refresh}
+                          />
                         </td>
                       </tr>
                     )
