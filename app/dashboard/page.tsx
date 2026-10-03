@@ -1,21 +1,17 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
-import { supabase } from '@/lib/supabase'
-import Actions from './actions'
 
 export default function DashboardPage() {
-  const router = useRouter()
   const [licenses, setLicenses] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
-  const [username, setUsername] = useState('')
   const [error, setError] = useState('')
+  const [username, setUsername] = useState('')
 
   useEffect(() => {
     const auth = localStorage.getItem('panel_auth')
     if (auth !== 'true') {
-      router.push('/login')
+      window.location.href = '/login'
       return
     }
     setUsername(localStorage.getItem('panel_user') || 'admin')
@@ -26,53 +22,49 @@ export default function DashboardPage() {
     setLoading(true)
     setError('')
     try {
-      const { data, error } = await supabase
-        .from('licenses')
-        .select('*')
-        .order('id', { ascending: false })
-
-      if (error) {
-        setError(error.message)
-        setLicenses([])
+      const res = await fetch('/api/license/list')
+      const data = await res.json()
+      if (data.status === 'success') {
+        setLicenses(data.licenses || [])
       } else {
-        setLicenses(data || [])
+        setError(data.message || 'خطأ في التحميل')
+        setLicenses([])
       }
     } catch (e: any) {
-      setError(e.message)
+      setError(e.message || 'خطأ في الاتصال')
       setLicenses([])
     }
     setLoading(false)
   }
 
-  async function handleLogout() {
+  function handleLogout() {
     localStorage.removeItem('panel_auth')
     localStorage.removeItem('panel_user')
-    router.push('/login')
-  }
-
-  const safeDate = (d: any) => {
-    if (!d) return null
-    const date = new Date(d)
-    if (isNaN(date.getTime())) return null
-    return date
+    window.location.href = '/login'
   }
 
   const total = licenses.length
   const active = licenses.filter(l => {
-    const exp = safeDate(l?.expires_at)
-    return exp && exp > new Date() && l?.is_active && !l?.is_banned
+    if (!l.expires_at) return false
+    const exp = new Date(l.expires_at)
+    return !isNaN(exp.getTime()) && exp > new Date() && l.is_active && !l.is_banned
   }).length
   const expired = licenses.filter(l => {
-    const exp = safeDate(l?.expires_at)
-    return exp && exp <= new Date()
+    if (!l.expires_at) return false
+    const exp = new Date(l.expires_at)
+    return !isNaN(exp.getTime()) && exp <= new Date()
   }).length
-  const banned = licenses.filter(l => l?.is_banned).length
+  const banned = licenses.filter(l => l.is_banned).length
 
   return (
-    <main className="royal-bg" style={{ minHeight: '100vh', padding: '25px 15px' }}>
-      <div className="container">
+    <main style={{
+      minHeight: '100vh',
+      background: '#050505',
+      color: '#e8e8e8',
+      padding: '25px 15px'
+    }}>
+      <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
 
-        {/* Header */}
         <div style={{
           background: 'linear-gradient(145deg, #0f0f0f, #1a1a1a)',
           border: '2px solid #d4af37',
@@ -80,8 +72,7 @@ export default function DashboardPage() {
           padding: '35px 25px 30px',
           marginBottom: '30px',
           position: 'relative',
-          textAlign: 'center',
-          boxShadow: '0 15px 50px rgba(0,0,0,0.8), 0 0 60px rgba(212,175,55,0.15)'
+          textAlign: 'center'
         }}>
           <div style={{
             position: 'absolute',
@@ -95,16 +86,12 @@ export default function DashboardPage() {
             borderRadius: '30px'
           }}>👤 {username}</div>
 
-          <div style={{ fontSize: '52px', filter: 'drop-shadow(0 0 25px rgba(212,175,55,0.9))' }}>👑</div>
+          <div style={{ fontSize: '52px' }}>👑</div>
 
           <h1 style={{
-            fontFamily: 'Georgia, serif',
-            fontWeight: 900,
             fontSize: '32px',
             letterSpacing: '6px',
-            background: 'linear-gradient(180deg, #f4d03f, #d4af37, #b8941f)',
-            WebkitBackgroundClip: 'text',
-            WebkitTextFillColor: 'transparent',
+            color: '#d4af37',
             marginTop: '10px'
           }}>ROYAL CONTROL</h1>
 
@@ -113,7 +100,6 @@ export default function DashboardPage() {
           </p>
         </div>
 
-        {/* Error */}
         {error && (
           <div style={{
             background: 'rgba(229,115,115,0.15)',
@@ -122,12 +108,10 @@ export default function DashboardPage() {
             padding: '15px',
             borderRadius: '10px',
             marginBottom: '20px',
-            textAlign: 'center',
-            fontSize: '13px'
+            textAlign: 'center'
           }}>⚠️ {error}</div>
         )}
 
-        {/* Stats */}
         <div style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
@@ -154,7 +138,6 @@ export default function DashboardPage() {
           ))}
         </div>
 
-        {/* Actions */}
         <div style={{
           display: 'flex',
           flexWrap: 'wrap',
@@ -162,19 +145,53 @@ export default function DashboardPage() {
           marginBottom: '30px',
           justifyContent: 'center'
         }}>
-          <a href="/dashboard/create" className="btn-gold">✦ إنشاء مفتاح ✦</a>
-          <a href="/dashboard/charts" className="btn-gold" style={{
-            background: 'transparent', color: '#d4af37', border: '1px solid rgba(212,175,55,0.6)'
+          <a href="/dashboard/create" style={{
+            display: 'inline-block',
+            padding: '14px 26px',
+            background: 'linear-gradient(135deg, #d4af37, #f4d03f)',
+            color: '#0a0a0a',
+            textDecoration: 'none',
+            borderRadius: '10px',
+            fontWeight: 700,
+            fontSize: '14px'
+          }}>✦ إنشاء مفتاح ✦</a>
+
+          <a href="/dashboard/charts" style={{
+            display: 'inline-block',
+            padding: '14px 26px',
+            background: 'transparent',
+            color: '#d4af37',
+            border: '1px solid rgba(212,175,55,0.6)',
+            textDecoration: 'none',
+            borderRadius: '10px',
+            fontWeight: 700,
+            fontSize: '14px'
           }}>📊 الإحصائيات</a>
-          <a href="/dashboard/activity" className="btn-gold" style={{
-            background: 'transparent', color: '#d4af37', border: '1px solid rgba(212,175,55,0.6)'
+
+          <a href="/dashboard/activity" style={{
+            display: 'inline-block',
+            padding: '14px 26px',
+            background: 'transparent',
+            color: '#d4af37',
+            border: '1px solid rgba(212,175,55,0.6)',
+            textDecoration: 'none',
+            borderRadius: '10px',
+            fontWeight: 700,
+            fontSize: '14px'
           }}>📜 السجل</a>
-          <button onClick={handleLogout} className="btn-gold" style={{
-            background: 'transparent', color: '#e57373', border: '1px solid rgba(229,115,115,0.5)'
+
+          <button onClick={handleLogout} style={{
+            padding: '14px 26px',
+            background: 'transparent',
+            color: '#e57373',
+            border: '1px solid rgba(229,115,115,0.5)',
+            borderRadius: '10px',
+            fontWeight: 700,
+            fontSize: '14px',
+            cursor: 'pointer'
           }}>🚪 خروج</button>
         </div>
 
-        {/* Table */}
         <div style={{
           background: 'linear-gradient(145deg, #0f0f0f, #1a1a1a)',
           border: '2px solid rgba(212,175,55,0.4)',
@@ -186,21 +203,22 @@ export default function DashboardPage() {
             borderBottom: '1px solid rgba(212,175,55,0.25)',
             textAlign: 'center'
           }}>
-            <h2 style={{
-              fontFamily: 'Georgia, serif',
-              color: '#d4af37',
-              fontSize: '20px',
-              letterSpacing: '4px'
-            }}>ROYAL LICENSES</h2>
+            <h2 style={{ color: '#d4af37', fontSize: '20px', letterSpacing: '4px' }}>
+              ROYAL LICENSES
+            </h2>
           </div>
 
           {loading ? (
-            <div style={{ padding: '60px', textAlign: 'center', color: '#666' }}>جاري التحميل...</div>
+            <div style={{ padding: '60px', textAlign: 'center', color: '#666' }}>
+              جاري التحميل...
+            </div>
           ) : licenses.length === 0 ? (
             <div style={{ padding: '60px', textAlign: 'center', color: '#888' }}>
               <div style={{ fontSize: '60px', marginBottom: '15px', opacity: 0.4 }}>📜</div>
-              <p style={{ letterSpacing: '2px', marginBottom: '15px' }}>لا توجد مفاتيح بعد</p>
-              <a href="/dashboard/create" style={{ color: '#d4af37' }}>➕ أنشئ أول مفتاح</a>
+              <p style={{ marginBottom: '15px' }}>لا توجد مفاتيح بعد</p>
+              <a href="/dashboard/create" style={{ color: '#d4af37' }}>
+                ➕ أنشئ أول مفتاح
+              </a>
             </div>
           ) : (
             <div style={{ overflowX: 'auto' }}>
@@ -211,38 +229,29 @@ export default function DashboardPage() {
                     <th style={{ background: 'rgba(212,175,55,0.1)', color: '#f4d03f', padding: '14px 10px', textAlign: 'right', fontSize: '11px' }}>TYPE</th>
                     <th style={{ background: 'rgba(212,175,55,0.1)', color: '#f4d03f', padding: '14px 10px', textAlign: 'right', fontSize: '11px' }}>EXPIRES</th>
                     <th style={{ background: 'rgba(212,175,55,0.1)', color: '#f4d03f', padding: '14px 10px', textAlign: 'right', fontSize: '11px' }}>STATUS</th>
-                    <th style={{ background: 'rgba(212,175,55,0.1)', color: '#f4d03f', padding: '14px 10px', textAlign: 'right', fontSize: '11px' }}>ACTIONS</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {licenses.map((l) => {
-                    const exp = safeDate(l?.expires_at)
-                    const isActive = exp && exp > new Date() && l?.is_active && !l?.is_banned
-                    const key = l?.license_key || '—'
+                  {licenses.map((l, i) => {
+                    const exp = l.expires_at ? new Date(l.expires_at) : null
+                    const isActive = exp && !isNaN(exp.getTime()) && exp > new Date() && l.is_active && !l.is_banned
                     return (
-                      <tr key={l?.id || Math.random()} style={{ borderBottom: '1px solid rgba(212,175,55,0.1)' }}>
+                      <tr key={l.id || i} style={{ borderBottom: '1px solid rgba(212,175,55,0.1)' }}>
                         <td style={{ padding: '14px 10px', fontSize: '11px', fontFamily: 'monospace', color: '#f4d03f' }}>
-                          {String(key).substring(0, 20)}...
+                          {String(l.license_key || '—').substring(0, 20)}...
                         </td>
                         <td style={{ padding: '14px 10px', fontSize: '12px', color: '#ccc' }}>
-                          {l?.duration_type || '—'}
+                          {l.duration_type || '—'}
                         </td>
                         <td style={{ padding: '14px 10px', fontSize: '11px', color: '#999' }}>
-                          {exp ? exp.toLocaleDateString('ar') : '—'}
+                          {exp && !isNaN(exp.getTime()) ? exp.toLocaleDateString('ar') : '—'}
                         </td>
                         <td style={{
                           padding: '14px 10px',
                           fontSize: '12px',
-                          color: l?.is_banned ? '#ef5350' : (isActive ? '#66bb6a' : '#ffa726')
+                          color: l.is_banned ? '#ef5350' : (isActive ? '#66bb6a' : '#ffa726')
                         }}>
-                          {l?.is_banned ? '🚫' : (isActive ? '✅' : '⏰')}
-                        </td>
-                        <td style={{ padding: '10px 6px' }}>
-                          <Actions 
-                            licenseId={l?.id} 
-                            isBanned={!!l?.is_banned} 
-                            onRefresh={loadLicenses} 
-                          />
+                          {l.is_banned ? '🚫 محظور' : (isActive ? '✅ نشط' : '⏰ منتهي')}
                         </td>
                       </tr>
                     )
