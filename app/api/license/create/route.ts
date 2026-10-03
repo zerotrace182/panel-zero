@@ -44,12 +44,10 @@ export async function POST(request: Request) {
       .eq('device_count', numDevices)
       .maybeSingle()
 
-    // إذا لم يكن هناك سعر محدد، نستخدم أعلى سعر أقرب عدد
     let devicePrice = 0
     if (devicePriceRow) {
       devicePrice = parseFloat(devicePriceRow.price)
     } else {
-      // جلب أقرب سعر أقل
       const { data: closest } = await supabaseAdmin
         .from('device_prices')
         .select('device_count, price')
@@ -61,7 +59,6 @@ export async function POST(request: Request) {
       if (closest) {
         devicePrice = parseFloat(closest.price)
       } else {
-        // إذا لم يوجد أي سعر، استخدم الأدنى
         const { data: lowest } = await supabaseAdmin
           .from('device_prices')
           .select('price')
@@ -72,7 +69,7 @@ export async function POST(request: Request) {
       }
     }
 
-    // 3. السعر الإجمالي للكود الواحد
+    // 3. السعر الإجمالي
     const pricePerKey = typePrice + devicePrice
     const totalCost = pricePerKey * numCount
 
@@ -92,6 +89,7 @@ export async function POST(request: Request) {
       if (user && (user.role === 'distributor' || user.role === 'owner')) {
         isDistributor = true
 
+        // ✅ 1. إذا الحساب معطل
         if (!user.is_active) {
           return NextResponse.json(
             {
@@ -104,20 +102,30 @@ export async function POST(request: Request) {
           )
         }
 
-        if (parseFloat(user.balance || 0) < totalCost) {
+        const currentBalance = parseFloat(user.balance || 0)
+
+        // ✅ 2. إذا الرصيد أقل من أو يساوي صفر → طرد فوري
+        if (currentBalance <= 0) {
           await supabaseAdmin
             .from('users')
             .update({
               is_active: false,
               banned_at: new Date().toISOString(),
-              ban_reason: 'انتهى الرصيد',
+              ban_reason: 'الرصيد = صفر',
             })
             .eq('id', user.id)
 
           await supabaseAdmin.from('activity_log').insert({
             action: 'AUTO_BAN',
-            details: `تعطيل تلقائي: ${username} - الرصيد غير كافٍ`,
+            details: `تعطيل تلقائي: ${username} — الرصيد صفر`,
             ip_address: request.headers.get('x-forwarded-for') || 'unknown',
+          })
+
+          await supabaseAdmin.from('transactions').insert({
+            user_id: user.id,
+            amount: 0,
+            type: 'auto_ban',
+            description: 'تعطيل الحساب: الرصيد صفر',
           })
 
           return NextResponse.json(
@@ -126,6 +134,45 @@ export async function POST(request: Request) {
               message: 'انتهى رصيدك، تم تعطيل حسابك',
               banned: true,
               telegram: 'https://t.me/op_mf',
+              balance: currentBalance,
+              required: totalCost,
+            },
+            { status: 403 }
+          )
+        }
+
+        // ✅ 3. إذا الرصيد أقل من سعر الكود → طرد فوري
+        if (currentBalance < totalCost) {
+          await supabaseAdmin
+            .from('users')
+            .update({
+              is_active: false,
+              banned_at: new Date().toISOString(),
+              ban_reason: `رصيد غير كافٍ (${currentBalance.toFixed(2)}$ من ${totalCost.toFixed(2)}$)`,
+            })
+            .eq('id', user.id)
+
+          await supabaseAdmin.from('activity_log').insert({
+            action: 'AUTO_BAN',
+            details: `تعطيل تلقائي: ${username} — الرصيد ${currentBalance.toFixed(2)}$ أقل من السعر ${totalCost.toFixed(2)}$`,
+            ip_address: request.headers.get('x-forwarded-for') || 'unknown',
+          })
+
+          await supabaseAdmin.from('transactions').insert({
+            user_id: user.id,
+            amount: 0,
+            type: 'auto_ban',
+            description: `تعطيل الحساب: الرصيد ${currentBalance.toFixed(2)}$ غير كافٍ`,
+          })
+
+          return NextResponse.json(
+            {
+              success: false,
+              message: `انتهى رصيدك (${currentBalance.toFixed(2)}$)، السعر المطلوب ${totalCost.toFixed(2)}$. تم تعطيل حسابك`,
+              banned: true,
+              telegram: 'https://t.me/op_mf',
+              balance: currentBalance,
+              required: totalCost,
             },
             { status: 403 }
           )
