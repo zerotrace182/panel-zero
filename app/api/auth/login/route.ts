@@ -15,7 +15,7 @@ export async function POST(request: Request) {
 
     const { data: user, error } = await supabaseAdmin
       .from('users')
-      .select('id, username, password, role, balance, is_active')
+      .select('id, username, password, role, balance, is_active, ban_reason')
       .eq('username', username)
       .maybeSingle()
 
@@ -26,14 +26,7 @@ export async function POST(request: Request) {
       )
     }
 
-    // تحقق من التفعيل
-    if (user.is_active === false) {
-      return NextResponse.json(
-        { success: false, message: 'حسابك معطل، تواصل مع الإدارة' },
-        { status: 403 }
-      )
-    }
-
+    // التحقق من كلمة المرور أولاً
     const isValid = await bcrypt.compare(password, user.password)
 
     if (!isValid) {
@@ -43,7 +36,66 @@ export async function POST(request: Request) {
       )
     }
 
-    // تسجيل دخول
+    // ✅ فحص حالة الحساب (بعد التأكد من كلمة المرور)
+    if (user.is_active === false) {
+      const reason = user.ban_reason || ''
+
+      // 1. إذا الحذف من قبل المطور
+      if (reason === 'تم الحذف من قبل المطور') {
+        return NextResponse.json(
+          {
+            success: false,
+            message: 'تم حذف حسابك من قبل المطور',
+            type: 'deleted',
+            deleted: true,
+            telegram: 'https://t.me/op_mf',
+          },
+          { status: 403 }
+        )
+      }
+
+      // 2. إذا انتهى الرصيد (طرد تلقائي)
+      if (reason === 'الرصيد = صفر' || reason.includes('رصيد غير كافٍ') || reason === 'انتهى الرصيد') {
+        return NextResponse.json(
+          {
+            success: false,
+            message: 'انتهى رصيدك، تواصل مع المطور للتجديد',
+            type: 'no_balance',
+            banned: true,
+            telegram: 'https://t.me/op_mf',
+          },
+          { status: 403 }
+        )
+      }
+
+      // 3. إيقاف مؤقت من الإدارة
+      if (reason === 'تم التعطيل من قبل الإدارة' || reason === 'إيقاف مؤقت') {
+        return NextResponse.json(
+          {
+            success: false,
+            message: 'حسابك موقوف مؤقتاً، تواصل مع الإدارة',
+            type: 'suspended',
+            banned: true,
+            telegram: 'https://t.me/op_mf',
+          },
+          { status: 403 }
+        )
+      }
+
+      // 4. تعطيل عام (أي سبب آخر)
+      return NextResponse.json(
+        {
+          success: false,
+          message: reason || 'حسابك معطل، تواصل مع الإدارة',
+          type: 'banned',
+          banned: true,
+          telegram: 'https://t.me/op_mf',
+        },
+        { status: 403 }
+      )
+    }
+
+    // تسجيل دخول ناجح
     await supabaseAdmin.from('activity_log').insert({
       action: 'LOGIN',
       details: `تسجيل دخول: ${username}`,
