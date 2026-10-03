@@ -10,6 +10,7 @@ interface ActionsProps {
 
 const PRESETS = [
   { value: 'day1', label: '📅 يوم' },
+  { value: 'day3', label: '📅 3 أيام' },
   { value: 'week1', label: '📆 أسبوع' },
   { value: 'month1', label: '🗓️ شهر' },
   { value: 'month2', label: '🗓️ شهران' },
@@ -26,67 +27,102 @@ export default function Actions({ licenseId, isBanned, onRefresh }: ActionsProps
   const [banReason, setBanReason] = useState('')
   const [renewType, setRenewType] = useState('month1')
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
 
   async function handleBan() {
     setLoading(true)
-    await fetch('/api/license/ban', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ license_id: licenseId, action: 'ban', reason: banReason }),
-    })
-    setShowBan(false)
-    setBanReason('')
+    setError('')
+    try {
+      const res = await fetch('/api/license/ban', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ license_id: licenseId, action: 'ban', reason: banReason }),
+      })
+      const data = await res.json()
+      if (data.success) {
+        setShowBan(false)
+        setBanReason('')
+        onRefresh()
+      } else {
+        setError(data.message || 'فشل')
+      }
+    } catch (e: any) {
+      setError(e.message)
+    }
     setLoading(false)
-    onRefresh()
   }
 
   async function handleUnban() {
     if (!confirm('فك الحظر عن هذا المفتاح؟')) return
     setLoading(true)
-    await fetch('/api/license/ban', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ license_id: licenseId, action: 'unban' }),
-    })
+    try {
+      const res = await fetch('/api/license/ban', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ license_id: licenseId, action: 'unban' }),
+      })
+      const data = await res.json()
+      if (data.success) onRefresh()
+    } catch (e) {}
     setLoading(false)
-    onRefresh()
   }
 
   async function handleRenew() {
     setLoading(true)
-    await fetch('/api/license/renew', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ license_id: licenseId, type: renewType }),
-    })
-    setShowRenew(false)
+    setError('')
+    try {
+      const res = await fetch('/api/license/renew', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ license_id: licenseId, type: renewType }),
+      })
+      const data = await res.json()
+      if (data.success) {
+        setShowRenew(false)
+        onRefresh()
+      } else {
+        setError(data.message || 'فشل')
+      }
+    } catch (e: any) {
+      setError(e.message)
+    }
     setLoading(false)
-    onRefresh()
   }
 
   async function handleDelete() {
     setLoading(true)
-    await fetch('/api/license/delete', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ license_id: licenseId }),
-    })
-    setShowDelete(false)
+    setError('')
+    try {
+      const res = await fetch('/api/license/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ license_id: licenseId }),
+      })
+      const data = await res.json()
+      if (data.success) {
+        setShowDelete(false)
+        onRefresh()
+      } else {
+        setError(data.message || 'فشل')
+      }
+    } catch (e: any) {
+      setError(e.message)
+    }
     setLoading(false)
-    onRefresh()
   }
 
-  const btnStyle = {
-    fontSize: '16px',
-    padding: '6px 10px',
+  const btnStyle: any = {
+    fontSize: '18px',
+    padding: '6px 8px',
     background: 'transparent',
     border: 'none',
     cursor: 'pointer',
-    color: '#d4af37',
+    margin: '0 2px',
+    borderRadius: '6px',
   }
 
-  const modalStyle = {
-    position: 'fixed' as const,
+  const modalStyle: any = {
+    position: 'fixed',
     top: 0, left: 0, right: 0, bottom: 0,
     background: 'rgba(0,0,0,0.85)',
     display: 'flex',
@@ -96,57 +132,121 @@ export default function Actions({ licenseId, isBanned, onRefresh }: ActionsProps
     padding: '20px',
   }
 
-  const boxStyle = {
+  const boxStyle: any = {
     background: 'linear-gradient(145deg, #0f0f0f, #1a1a1a)',
     border: '2px solid #d4af37',
     borderRadius: '20px',
     padding: '30px 25px',
-    maxWidth: '400px',
+    maxWidth: '420px',
     width: '100%',
   }
 
+  const inputStyle: any = {
+    width: '100%',
+    padding: '12px',
+    background: '#0a0a0a',
+    border: '1px solid rgba(212,175,55,0.4)',
+    borderRadius: '10px',
+    color: '#e8e8e8',
+    fontSize: '14px',
+    marginBottom: '15px',
+    boxSizing: 'border-box',
+    outline: 'none',
+  }
+
   return (
-    <div style={{ display: 'flex', gap: '5px', justifyContent: 'flex-start' }}>
+    <div style={{ display: 'flex', gap: '2px', justifyContent: 'flex-start', whiteSpace: 'nowrap' }}>
       {isBanned ? (
-        <button onClick={handleUnban} style={{ ...btnStyle, color: '#66bb6a' }} title="فك الحظر">
-          ✅
-        </button>
+        <button
+          onClick={handleUnban}
+          disabled={loading}
+          style={{ ...btnStyle, color: '#66bb6a' }}
+          title="فك الحظر"
+        >✅</button>
       ) : (
-        <button onClick={() => setShowBan(true)} style={{ ...btnStyle, color: '#ef5350' }} title="حظر">
-          🚫
-        </button>
+        <button
+          onClick={() => setShowBan(true)}
+          disabled={loading}
+          style={{ ...btnStyle, color: '#ef5350' }}
+          title="حظر"
+        >🚫</button>
       )}
 
-      <button onClick={() => setShowRenew(true)} style={{ ...btnStyle, color: '#66bb6a' }} title="تجديد">
-        ♻️
-      </button>
+      <button
+        onClick={() => setShowRenew(true)}
+        disabled={loading}
+        style={{ ...btnStyle, color: '#4CAF50' }}
+        title="تجديد"
+      >♻️</button>
 
-      <button onClick={() => setShowDelete(true)} style={{ ...btnStyle, color: '#e57373' }} title="حذف">
-        🗑️
-      </button>
+      <button
+        onClick={() => setShowDelete(true)}
+        disabled={loading}
+        style={{ ...btnStyle, color: '#e57373' }}
+        title="حذف"
+      >🗑️</button>
 
       {/* Ban Modal */}
       {showBan && (
         <div style={modalStyle} onClick={() => setShowBan(false)}>
           <div style={boxStyle} onClick={e => e.stopPropagation()}>
-            <h3 style={{ color: '#ef5350', textAlign: 'center', marginBottom: '20px' }}>🚫 حظر المفتاح</h3>
+            <h3 style={{ color: '#ef5350', textAlign: 'center', marginBottom: '20px' }}>
+              🚫 حظر المفتاح
+            </h3>
+
+            {error && (
+              <div style={{
+                background: 'rgba(229,115,115,0.15)',
+                color: '#ef5350',
+                padding: '10px',
+                borderRadius: '8px',
+                marginBottom: '15px',
+                textAlign: 'center',
+                fontSize: '13px'
+              }}>⚠️ {error}</div>
+            )}
+
+            <label style={{ display: 'block', color: '#d4af37', fontSize: '12px', marginBottom: '8px' }}>
+              سبب الحظر (اختياري)
+            </label>
             <input
               type="text"
-              placeholder="سبب الحظر (اختياري)"
+              placeholder="مثال: استخدام غير مصرح"
               value={banReason}
               onChange={e => setBanReason(e.target.value)}
-              className="input"
-              style={{ marginBottom: '20px' }}
+              style={inputStyle}
             />
+
             <div style={{ display: 'flex', gap: '10px' }}>
-              <button onClick={handleBan} disabled={loading} className="btn-gold"
-                style={{ flex: 1, background: '#c62828', color: '#fff' }}>
-                {loading ? '...' : 'تأكيد'}
-              </button>
-              <button onClick={() => setShowBan(false)} className="btn-gold"
-                style={{ flex: 1, background: 'transparent', color: '#d4af37', border: '1px solid #d4af37' }}>
-                إلغاء
-              </button>
+              <button
+                onClick={handleBan}
+                disabled={loading}
+                style={{
+                  flex: 1,
+                  padding: '12px',
+                  background: 'linear-gradient(135deg, #c62828, #e57373)',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: '10px',
+                  fontWeight: 700,
+                  cursor: loading ? 'wait' : 'pointer',
+                  opacity: loading ? 0.6 : 1
+                }}
+              >{loading ? '...' : 'تأكيد'}</button>
+
+              <button
+                onClick={() => setShowBan(false)}
+                style={{
+                  flex: 1,
+                  padding: '12px',
+                  background: 'transparent',
+                  color: '#d4af37',
+                  border: '1px solid #d4af37',
+                  borderRadius: '10px',
+                  fontWeight: 700,
+                  cursor: 'pointer'
+                }}
+              >إلغاء</button>
             </div>
           </div>
         </div>
@@ -156,22 +256,69 @@ export default function Actions({ licenseId, isBanned, onRefresh }: ActionsProps
       {showRenew && (
         <div style={modalStyle} onClick={() => setShowRenew(false)}>
           <div style={boxStyle} onClick={e => e.stopPropagation()}>
-            <h3 style={{ color: '#66bb6a', textAlign: 'center', marginBottom: '20px' }}>♻️ تجديد المفتاح</h3>
-            <select value={renewType} onChange={e => setRenewType(e.target.value)} className="input"
-              style={{ marginBottom: '20px' }}>
+            <h3 style={{ color: '#4CAF50', textAlign: 'center', marginBottom: '20px' }}>
+              ♻️ تجديد المفتاح
+            </h3>
+
+            {error && (
+              <div style={{
+                background: 'rgba(229,115,115,0.15)',
+                color: '#ef5350',
+                padding: '10px',
+                borderRadius: '8px',
+                marginBottom: '15px',
+                textAlign: 'center',
+                fontSize: '13px'
+              }}>⚠️ {error}</div>
+            )}
+
+            <label style={{ display: 'block', color: '#d4af37', fontSize: '12px', marginBottom: '8px' }}>
+              نوع الإضافة
+            </label>
+            <select
+              value={renewType}
+              onChange={e => setRenewType(e.target.value)}
+              style={inputStyle}
+            >
               {PRESETS.map(p => (
                 <option key={p.value} value={p.value}>{p.label}</option>
               ))}
             </select>
+
+            <p style={{ color: '#888', fontSize: '11px', textAlign: 'center', marginBottom: '15px' }}>
+              💡 يُضاف للمدة الحالية (أو يبدأ من اليوم إذا منتهي)
+            </p>
+
             <div style={{ display: 'flex', gap: '10px' }}>
-              <button onClick={handleRenew} disabled={loading} className="btn-gold"
-                style={{ flex: 1, background: '#4CAF50', color: '#fff' }}>
-                {loading ? '...' : 'تأكيد'}
-              </button>
-              <button onClick={() => setShowRenew(false)} className="btn-gold"
-                style={{ flex: 1, background: 'transparent', color: '#d4af37', border: '1px solid #d4af37' }}>
-                إلغاء
-              </button>
+              <button
+                onClick={handleRenew}
+                disabled={loading}
+                style={{
+                  flex: 1,
+                  padding: '12px',
+                  background: 'linear-gradient(135deg, #4CAF50, #66bb6a)',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: '10px',
+                  fontWeight: 700,
+                  cursor: loading ? 'wait' : 'pointer',
+                  opacity: loading ? 0.6 : 1
+                }}
+              >{loading ? '...' : 'تأكيد التجديد'}</button>
+
+              <button
+                onClick={() => setShowRenew(false)}
+                style={{
+                  flex: 1,
+                  padding: '12px',
+                  background: 'transparent',
+                  color: '#d4af37',
+                  border: '1px solid #d4af37',
+                  borderRadius: '10px',
+                  fontWeight: 700,
+                  cursor: 'pointer'
+                }}
+              >إلغاء</button>
             </div>
           </div>
         </div>
@@ -181,19 +328,56 @@ export default function Actions({ licenseId, isBanned, onRefresh }: ActionsProps
       {showDelete && (
         <div style={modalStyle} onClick={() => setShowDelete(false)}>
           <div style={boxStyle} onClick={e => e.stopPropagation()}>
-            <h3 style={{ color: '#ef5350', textAlign: 'center', marginBottom: '20px' }}>🗑️ حذف المفتاح</h3>
+            <h3 style={{ color: '#ef5350', textAlign: 'center', marginBottom: '20px' }}>
+              🗑️ حذف المفتاح
+            </h3>
+
+            {error && (
+              <div style={{
+                background: 'rgba(229,115,115,0.15)',
+                color: '#ef5350',
+                padding: '10px',
+                borderRadius: '8px',
+                marginBottom: '15px',
+                textAlign: 'center',
+                fontSize: '13px'
+              }}>⚠️ {error}</div>
+            )}
+
             <p style={{ color: '#ffab91', textAlign: 'center', marginBottom: '20px' }}>
-              هل أنت متأكد؟ لا يمكن التراجع!
+              ⚠️ هل أنت متأكد؟ لا يمكن التراجع!
             </p>
+
             <div style={{ display: 'flex', gap: '10px' }}>
-              <button onClick={handleDelete} disabled={loading} className="btn-gold"
-                style={{ flex: 1, background: '#c62828', color: '#fff' }}>
-                {loading ? '...' : 'نعم، احذف'}
-              </button>
-              <button onClick={() => setShowDelete(false)} className="btn-gold"
-                style={{ flex: 1, background: 'transparent', color: '#d4af37', border: '1px solid #d4af37' }}>
-                إلغاء
-              </button>
+              <button
+                onClick={handleDelete}
+                disabled={loading}
+                style={{
+                  flex: 1,
+                  padding: '12px',
+                  background: 'linear-gradient(135deg, #c62828, #e57373)',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: '10px',
+                  fontWeight: 700,
+                  cursor: loading ? 'wait' : 'pointer',
+                  opacity: loading ? 0.6 : 1
+                }}
+              >{loading ? '...' : 'نعم، احذف'}</button>
+
+              <button
+                onClick={() => setShowDelete(false)}
+                style={{
+                  flex: 1,
+                  padding: '12px',
+                  background: 'transparent',
+                  color: '#d4af37',
+                  border: '1px solid #d4af37',
+                  borderRadius: '10px',
+                  fontWeight: 700,
+                  cursor: 'pointer'
+                }}
+              >إلغاء</button>
             </div>
           </div>
         </div>
