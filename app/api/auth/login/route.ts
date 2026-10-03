@@ -15,14 +15,22 @@ export async function POST(request: Request) {
 
     const { data: user, error } = await supabaseAdmin
       .from('users')
-      .select('*')
+      .select('id, username, password, role, balance, is_active')
       .eq('username', username)
-      .single()
+      .maybeSingle()
 
     if (error || !user) {
       return NextResponse.json(
         { success: false, message: 'بيانات خاطئة' },
         { status: 401 }
+      )
+    }
+
+    // تحقق من التفعيل
+    if (user.is_active === false) {
+      return NextResponse.json(
+        { success: false, message: 'حسابك معطل، تواصل مع الإدارة' },
+        { status: 403 }
       )
     }
 
@@ -35,10 +43,19 @@ export async function POST(request: Request) {
       )
     }
 
+    // تسجيل دخول
+    await supabaseAdmin.from('activity_log').insert({
+      action: 'LOGIN',
+      details: `تسجيل دخول: ${username}`,
+      ip_address: request.headers.get('x-forwarded-for') || 'unknown',
+    })
+
     return NextResponse.json({
       success: true,
       username: user.username,
       userId: user.id,
+      role: user.role || 'admin',
+      balance: parseFloat(user.balance || 0),
     })
   } catch (error: any) {
     return NextResponse.json(
