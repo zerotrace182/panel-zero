@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
+import Actions from './actions'
 
 export default function DashboardPage() {
   const router = useRouter()
@@ -45,7 +46,6 @@ export default function DashboardPage() {
     new Date(l.expires_at) <= new Date()
   ).length
   const banned = licenses.filter(l => l.is_banned).length
-  const devices = licenses.reduce((sum, l) => sum + (l.max_devices || 0), 0)
 
   return (
     <main className="royal-bg" style={{ minHeight: '100vh', padding: '25px 15px' }}>
@@ -74,10 +74,7 @@ export default function DashboardPage() {
             borderRadius: '30px'
           }}>👤 {username}</div>
 
-          <div style={{
-            fontSize: '52px',
-            filter: 'drop-shadow(0 0 25px rgba(212,175,55,0.9))'
-          }}>👑</div>
+          <div style={{ fontSize: '52px', filter: 'drop-shadow(0 0 25px rgba(212,175,55,0.9))' }}>👑</div>
 
           <h1 style={{
             fontFamily: 'Georgia, serif',
@@ -90,12 +87,9 @@ export default function DashboardPage() {
             marginTop: '10px'
           }}>ROYAL CONTROL</h1>
 
-          <p style={{
-            color: '#b8941f',
-            fontSize: '11px',
-            letterSpacing: '8px',
-            marginTop: '8px'
-          }}>PREMIUM LICENSE MANAGEMENT</p>
+          <p style={{ color: '#b8941f', fontSize: '11px', letterSpacing: '8px', marginTop: '8px' }}>
+            PREMIUM LICENSE MANAGEMENT
+          </p>
         </div>
 
         {/* Stats */}
@@ -109,8 +103,7 @@ export default function DashboardPage() {
             { icon: '📋', value: total, label: 'TOTAL' },
             { icon: '✅', value: active, label: 'ACTIVE' },
             { icon: '⏰', value: expired, label: 'EXPIRED' },
-            { icon: '🚫', value: banned, label: 'BANNED' },
-            { icon: '💻', value: devices, label: 'DEVICES' }
+            { icon: '🚫', value: banned, label: 'BANNED' }
           ].map((s, i) => (
             <div key={i} style={{
               background: 'linear-gradient(145deg, #0f0f0f, #1a1a1a)',
@@ -120,17 +113,8 @@ export default function DashboardPage() {
               textAlign: 'center'
             }}>
               <div style={{ fontSize: '32px', marginBottom: '10px' }}>{s.icon}</div>
-              <div style={{
-                fontSize: '34px',
-                fontWeight: 900,
-                color: '#d4af37',
-                marginBottom: '5px'
-              }}>{s.value}</div>
-              <div style={{
-                color: '#999',
-                fontSize: '11px',
-                letterSpacing: '2px'
-              }}>{s.label}</div>
+              <div style={{ fontSize: '34px', fontWeight: 900, color: '#d4af37', marginBottom: '5px' }}>{s.value}</div>
+              <div style={{ color: '#999', fontSize: '11px', letterSpacing: '2px' }}>{s.label}</div>
             </div>
           ))}
         </div>
@@ -145,19 +129,13 @@ export default function DashboardPage() {
         }}>
           <a href="/dashboard/create" className="btn-gold">✦ إنشاء مفتاح ✦</a>
           <a href="/dashboard/charts" className="btn-gold" style={{
-            background: 'transparent',
-            color: '#d4af37',
-            border: '1px solid rgba(212,175,55,0.6)'
+            background: 'transparent', color: '#d4af37', border: '1px solid rgba(212,175,55,0.6)'
           }}>📊 الإحصائيات</a>
           <a href="/dashboard/activity" className="btn-gold" style={{
-            background: 'transparent',
-            color: '#d4af37',
-            border: '1px solid rgba(212,175,55,0.6)'
+            background: 'transparent', color: '#d4af37', border: '1px solid rgba(212,175,55,0.6)'
           }}>📜 السجل</a>
           <button onClick={handleLogout} className="btn-gold" style={{
-            background: 'transparent',
-            color: '#e57373',
-            border: '1px solid rgba(229,115,115,0.5)'
+            background: 'transparent', color: '#e57373', border: '1px solid rgba(229,115,115,0.5)'
           }}>🚪 خروج</button>
         </div>
 
@@ -182,9 +160,7 @@ export default function DashboardPage() {
           </div>
 
           {loading ? (
-            <div style={{ padding: '60px', textAlign: 'center', color: '#666' }}>
-              جاري التحميل...
-            </div>
+            <div style={{ padding: '60px', textAlign: 'center', color: '#666' }}>جاري التحميل...</div>
           ) : licenses.length === 0 ? (
             <div style={{ padding: '60px', textAlign: 'center', color: '#888' }}>
               <div style={{ fontSize: '60px', marginBottom: '15px', opacity: 0.4 }}>📜</div>
@@ -196,35 +172,11 @@ export default function DashboardPage() {
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
                   <tr>
-                    <th style={{
-                      background: 'rgba(212,175,55,0.1)',
-                      color: '#f4d03f',
-                      padding: '14px 10px',
-                      textAlign: 'right',
-                      fontSize: '11px',
-                      letterSpacing: '2px'
-                    }}>KEY</th>
-                    <th style={{
-                      background: 'rgba(212,175,55,0.1)',
-                      color: '#f4d03f',
-                      padding: '14px 10px',
-                      textAlign: 'right',
-                      fontSize: '11px'
-                    }}>TYPE</th>
-                    <th style={{
-                      background: 'rgba(212,175,55,0.1)',
-                      color: '#f4d03f',
-                      padding: '14px 10px',
-                      textAlign: 'right',
-                      fontSize: '11px'
-                    }}>EXPIRES</th>
-                    <th style={{
-                      background: 'rgba(212,175,55,0.1)',
-                      color: '#f4d03f',
-                      padding: '14px 10px',
-                      textAlign: 'right',
-                      fontSize: '11px'
-                    }}>STATUS</th>
+                    <th style={{ background: 'rgba(212,175,55,0.1)', color: '#f4d03f', padding: '14px 10px', textAlign: 'right', fontSize: '11px' }}>KEY</th>
+                    <th style={{ background: 'rgba(212,175,55,0.1)', color: '#f4d03f', padding: '14px 10px', textAlign: 'right', fontSize: '11px' }}>TYPE</th>
+                    <th style={{ background: 'rgba(212,175,55,0.1)', color: '#f4d03f', padding: '14px 10px', textAlign: 'right', fontSize: '11px' }}>EXPIRES</th>
+                    <th style={{ background: 'rgba(212,175,55,0.1)', color: '#f4d03f', padding: '14px 10px', textAlign: 'right', fontSize: '11px' }}>STATUS</th>
+                    <th style={{ background: 'rgba(212,175,55,0.1)', color: '#f4d03f', padding: '14px 10px', textAlign: 'right', fontSize: '11px' }}>ACTIONS</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -233,7 +185,7 @@ export default function DashboardPage() {
                     return (
                       <tr key={l.id} style={{ borderBottom: '1px solid rgba(212,175,55,0.1)' }}>
                         <td style={{ padding: '14px 10px', fontSize: '11px', fontFamily: 'monospace', color: '#f4d03f' }}>
-                          {l.license_key}
+                          {l.license_key.substring(0, 20)}...
                         </td>
                         <td style={{ padding: '14px 10px', fontSize: '12px', color: '#ccc' }}>
                           {l.duration_type}
@@ -246,7 +198,14 @@ export default function DashboardPage() {
                           fontSize: '12px',
                           color: l.is_banned ? '#ef5350' : (isActive ? '#66bb6a' : '#ffa726')
                         }}>
-                          {l.is_banned ? '🚫 محظور' : (isActive ? '✅ نشط' : '⏰ منتهي')}
+                          {l.is_banned ? '🚫' : (isActive ? '✅' : '⏰')}
+                        </td>
+                        <td style={{ padding: '10px 6px' }}>
+                          <Actions 
+                            licenseId={l.id} 
+                            isBanned={l.is_banned} 
+                            onRefresh={loadLicenses} 
+                          />
                         </td>
                       </tr>
                     )
