@@ -24,7 +24,13 @@ export async function POST(request: Request) {
       )
     }
 
-    const days = PRESETS[type] || 30
+    const days = PRESETS[type]
+    if (!days) {
+      return NextResponse.json(
+        { success: false, message: 'نوع غير صالح' },
+        { status: 400 }
+      )
+    }
 
     const { data: lic, error: fetchError } = await supabaseAdmin
       .from('licenses')
