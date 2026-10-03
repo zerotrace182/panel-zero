@@ -1,20 +1,19 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
 
 export default function CreateKeyPage() {
-  const router = useRouter()
   const [type, setType] = useState('month1')
   const [count, setCount] = useState(1)
   const [devices, setDevices] = useState(1)
   const [loading, setLoading] = useState(false)
   const [keys, setKeys] = useState<string[]>([])
   const [error, setError] = useState('')
+  const [cost, setCost] = useState(0)
 
   useEffect(() => {
     if (localStorage.getItem('panel_auth') !== 'true') {
-      router.push('/login')
+      window.location.href = '/login'
     }
   }, [])
 
@@ -23,23 +22,39 @@ export default function CreateKeyPage() {
     setError('')
     setLoading(true)
     setKeys([])
+    setCost(0)
 
     try {
+      const username = localStorage.getItem('panel_user') || ''
+
       const res = await fetch('/api/license/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type, count, devices }),
+        body: JSON.stringify({
+          type,
+          count,
+          devices,
+          username,
+        }),
       })
 
       const data = await res.json()
 
       if (data.success) {
-        setKeys(data.keys)
+        setKeys(data.keys || [])
+        setCost(data.cost || 0)
+
+        // خصم الرصيد من localStorage إن وُجد
+        if (data.cost > 0) {
+          const currentBalance = parseFloat(localStorage.getItem('panel_balance') || '0')
+          const newBalance = Math.max(0, currentBalance - data.cost)
+          localStorage.setItem('panel_balance', String(newBalance))
+        }
       } else {
         setError(data.message || 'فشل إنشاء المفاتيح')
       }
     } catch (err: any) {
-      setError(err.message)
+      setError(err.message || 'خطأ في الاتصال')
     } finally {
       setLoading(false)
     }
@@ -51,8 +66,14 @@ export default function CreateKeyPage() {
   }
 
   return (
-    <main className="royal-bg" style={{ minHeight: '100vh', padding: '25px 15px' }}>
-      <div className="container" style={{ maxWidth: '600px' }}>
+    <main style={{
+      minHeight: '100vh',
+      background: '#050505',
+      backgroundImage: 'radial-gradient(ellipse at top left, rgba(212,175,55,.08) 0%, transparent 45%), radial-gradient(ellipse at bottom right, rgba(212,175,55,.08) 0%, transparent 45%)',
+      color: '#e8e8e8',
+      padding: '25px 15px'
+    }}>
+      <div style={{ maxWidth: '600px', margin: '0 auto' }}>
 
         <a href="/dashboard" style={{
           color: '#d4af37',
@@ -105,12 +126,28 @@ export default function CreateKeyPage() {
           )}
 
           <form onSubmit={handleCreate}>
-            <label className="label">نوع المدة</label>
+            <label style={{
+              display: 'block',
+              color: '#d4af37',
+              fontSize: '12px',
+              marginBottom: '8px',
+              letterSpacing: '2px'
+            }}>نوع المدة</label>
             <select
               value={type}
               onChange={(e) => setType(e.target.value)}
-              className="input"
-              style={{ marginBottom: '20px' }}
+              style={{
+                width: '100%',
+                padding: '14px',
+                background: '#0a0a0a',
+                border: '1px solid rgba(212,175,55,0.3)',
+                borderRadius: '10px',
+                color: '#e8e8e8',
+                fontSize: '15px',
+                marginBottom: '20px',
+                boxSizing: 'border-box',
+                outline: 'none'
+              }}
             >
               <option value="day1">📅 يوم واحد</option>
               <option value="day3">📅 3 أيام</option>
@@ -123,37 +160,74 @@ export default function CreateKeyPage() {
               <option value="forever">♾️ دائم</option>
             </select>
 
-            <label className="label">عدد المفاتيح (1-50)</label>
+            <label style={{
+              display: 'block',
+              color: '#d4af37',
+              fontSize: '12px',
+              marginBottom: '8px',
+              letterSpacing: '2px'
+            }}>عدد المفاتيح (1-50)</label>
             <select
               value={count}
               onChange={(e) => setCount(parseInt(e.target.value))}
-              className="input"
-              style={{ marginBottom: '20px' }}
+              style={{
+                width: '100%',
+                padding: '14px',
+                background: '#0a0a0a',
+                border: '1px solid rgba(212,175,55,0.3)',
+                borderRadius: '10px',
+                color: '#e8e8e8',
+                fontSize: '15px',
+                marginBottom: '20px',
+                boxSizing: 'border-box',
+                outline: 'none'
+              }}
             >
               {Array.from({ length: 50 }, (_, i) => i + 1).map(n => (
                 <option key={n} value={n}>{n} مفتاح</option>
               ))}
             </select>
 
-            <label className="label">عدد الأجهزة المسموحة</label>
+            <label style={{
+              display: 'block',
+              color: '#d4af37',
+              fontSize: '12px',
+              marginBottom: '8px',
+              letterSpacing: '2px'
+            }}>عدد الأجهزة المسموحة</label>
             <input
               type="number"
               value={devices}
               onChange={(e) => setDevices(parseInt(e.target.value))}
               min={1}
-              className="input"
-              style={{ marginBottom: '25px' }}
+              style={{
+                width: '100%',
+                padding: '14px',
+                background: '#0a0a0a',
+                border: '1px solid rgba(212,175,55,0.3)',
+                borderRadius: '10px',
+                color: '#e8e8e8',
+                fontSize: '15px',
+                marginBottom: '25px',
+                boxSizing: 'border-box',
+                outline: 'none'
+              }}
             />
 
             <button
               type="submit"
               disabled={loading}
-              className="btn-gold"
               style={{
                 width: '100%',
                 padding: '16px',
+                background: 'linear-gradient(135deg, #d4af37, #f4d03f)',
+                color: '#0a0a0a',
+                border: 'none',
+                borderRadius: '10px',
+                fontWeight: 900,
                 fontSize: '15px',
                 letterSpacing: '3px',
+                cursor: loading ? 'wait' : 'pointer',
                 opacity: loading ? 0.6 : 1
               }}
             >
@@ -171,11 +245,17 @@ export default function CreateKeyPage() {
                 borderRadius: '10px',
                 marginBottom: '15px',
                 textAlign: 'center'
-              }}>✅ تم إنشاء {keys.length} مفتاح</div>
+              }}>
+                ✅ تم إنشاء {keys.length} مفتاح
+                {cost > 0 && (
+                  <div style={{ color: '#f4d03f', fontSize: '13px', marginTop: '5px' }}>
+                    💰 التكلفة: ${cost.toFixed(2)}
+                  </div>
+                )}
+              </div>
 
               <button
                 onClick={copyAll}
-                className="btn-gold"
                 style={{
                   width: '100%',
                   padding: '12px',
@@ -183,7 +263,10 @@ export default function CreateKeyPage() {
                   marginBottom: '15px',
                   background: 'transparent',
                   color: '#d4af37',
-                  border: '1px solid rgba(212,175,55,0.6)'
+                  border: '1px solid rgba(212,175,55,0.6)',
+                  borderRadius: '10px',
+                  fontWeight: 700,
+                  cursor: 'pointer'
                 }}
               >📋 نسخ كل المفاتيح</button>
 
