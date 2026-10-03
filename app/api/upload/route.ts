@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
-import crypto from 'crypto'
+
+export const runtime = 'nodejs'
+export const dynamic = 'force-dynamic'
 
 export async function POST(request: Request) {
   try {
@@ -14,7 +16,6 @@ export async function POST(request: Request) {
       )
     }
 
-    // التحقق من النوع
     if (!file.type.startsWith('image/')) {
       return NextResponse.json(
         { success: false, message: 'يجب أن يكون الملف صورة' },
@@ -22,7 +23,6 @@ export async function POST(request: Request) {
       )
     }
 
-    // التحقق من الحجم (5MB)
     if (file.size > 5 * 1024 * 1024) {
       return NextResponse.json(
         { success: false, message: 'حجم الصورة أكبر من 5MB' },
@@ -30,18 +30,19 @@ export async function POST(request: Request) {
       )
     }
 
-    // توليد اسم عشوائي
+    // توليد اسم عشوائي بدون crypto
+    const timestamp = Date.now()
+    const random = Math.random().toString(36).substring(2, 15)
     const ext = file.name.split('.').pop() || 'jpg'
-    const fileName = `${crypto.randomBytes(16).toString('hex')}.${ext}`
+    const fileName = `${timestamp}_${random}.${ext}`
 
     // قراءة الملف
     const arrayBuffer = await file.arrayBuffer()
-    const buffer = Buffer.from(arrayBuffer)
 
     // رفع إلى Supabase Storage
     const { data, error } = await supabaseAdmin.storage
       .from('distributors')
-      .upload(fileName, buffer, {
+      .upload(fileName, arrayBuffer, {
         contentType: file.type,
         upsert: false,
       })
@@ -64,8 +65,9 @@ export async function POST(request: Request) {
       path: data.path,
     })
   } catch (err: any) {
+    console.error('Upload error:', err)
     return NextResponse.json(
-      { success: false, message: err.message },
+      { success: false, message: err.message || 'Server error' },
       { status: 500 }
     )
   }
