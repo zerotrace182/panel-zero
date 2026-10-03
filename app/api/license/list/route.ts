@@ -1,13 +1,25 @@
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    const { data, error } = await supabaseAdmin
+    const { searchParams } = new URL(request.url)
+    const filter = searchParams.get('filter') || 'all'
+
+    let query = supabaseAdmin
       .from('licenses')
       .select('*')
       .order('id', { ascending: false })
       .limit(500)
+
+    // فلترة
+    if (filter === 'active') {
+      query = query.eq('is_banned', false)
+    } else if (filter === 'banned') {
+      query = query.eq('is_banned', true)
+    }
+
+    const { data, error } = await query
 
     if (error) {
       return NextResponse.json(
@@ -16,7 +28,7 @@ export async function GET() {
       )
     }
 
-    // حساب عدد الأجهزة لكل مفتاح
+    // حساب عدد الأجهزة
     const licensesWithDevices = await Promise.all(
       (data || []).map(async (l) => {
         const { count } = await supabaseAdmin
