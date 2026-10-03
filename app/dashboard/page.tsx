@@ -5,11 +5,13 @@ import Actions from './actions'
 
 export default function DashboardPage() {
   const [licenses, setLicenses] = useState<any[]>([])
+  const [allLicenses, setAllLicenses] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [username, setUsername] = useState('')
   const [userRole, setUserRole] = useState('admin')
   const [userBalance, setUserBalance] = useState(0)
+  const [tab, setTab] = useState<'active' | 'banned'>('active')
 
   useEffect(() => {
     const auth = localStorage.getItem('panel_auth')
@@ -20,14 +22,25 @@ export default function DashboardPage() {
     setUsername(localStorage.getItem('panel_user') || 'admin')
     setUserRole(localStorage.getItem('panel_role') || 'admin')
     setUserBalance(parseFloat(localStorage.getItem('panel_balance') || '0'))
-    loadLicenses()
   }, [])
 
-  async function loadLicenses() {
+  useEffect(() => {
+    loadLicenses(tab)
+  }, [tab])
+
+  async function loadLicenses(currentTab: 'active' | 'banned') {
     setLoading(true)
     setError('')
     try {
-      const res = await fetch('/api/license/list')
+      // جلب الكل (للعدادات)
+      const resAll = await fetch('/api/license/list')
+      const dataAll = await resAll.json()
+      if (dataAll.status === 'success') {
+        setAllLicenses(dataAll.licenses || [])
+      }
+
+      // جلب المفلتر حسب التبويب
+      const res = await fetch(`/api/license/list?filter=${currentTab === 'banned' ? 'banned' : 'active'}`)
       const data = await res.json()
       if (data.status === 'success') {
         setLicenses(data.licenses || [])
@@ -42,6 +55,10 @@ export default function DashboardPage() {
     setLoading(false)
   }
 
+  function refresh() {
+    loadLicenses(tab)
+  }
+
   function handleLogout() {
     localStorage.removeItem('panel_auth')
     localStorage.removeItem('panel_user')
@@ -50,18 +67,18 @@ export default function DashboardPage() {
     window.location.href = '/login'
   }
 
-  const total = licenses.length
-  const active = licenses.filter(l => {
+  const total = allLicenses.length
+  const active = allLicenses.filter(l => {
     if (!l.expires_at) return false
     const exp = new Date(l.expires_at)
     return !isNaN(exp.getTime()) && exp > new Date() && l.is_active && !l.is_banned
   }).length
-  const expired = licenses.filter(l => {
+  const expired = allLicenses.filter(l => {
     if (!l.expires_at) return false
     const exp = new Date(l.expires_at)
-    return !isNaN(exp.getTime()) && exp <= new Date()
+    return !isNaN(exp.getTime()) && exp <= new Date() && !l.is_banned
   }).length
-  const banned = licenses.filter(l => l.is_banned).length
+  const banned = allLicenses.filter(l => l.is_banned).length
 
   const isAdmin = userRole === 'admin' || userRole === 'owner'
 
@@ -150,10 +167,10 @@ export default function DashboardPage() {
           marginBottom: '30px'
         }}>
           {[
-            { icon: '📋', value: total, label: 'TOTAL' },
-            { icon: '✅', value: active, label: 'ACTIVE' },
-            { icon: '⏰', value: expired, label: 'EXPIRED' },
-            { icon: '🚫', value: banned, label: 'BANNED' }
+            { icon: '📋', value: total, label: 'TOTAL', color: '#d4af37' },
+            { icon: '✅', value: active, label: 'ACTIVE', color: '#66bb6a' },
+            { icon: '⏰', value: expired, label: 'EXPIRED', color: '#ffa726' },
+            { icon: '🚫', value: banned, label: 'BANNED', color: '#ef5350' }
           ].map((s, i) => (
             <div key={i} style={{
               background: 'linear-gradient(145deg, #0f0f0f, #1a1a1a)',
@@ -163,7 +180,7 @@ export default function DashboardPage() {
               textAlign: 'center'
             }}>
               <div style={{ fontSize: '32px', marginBottom: '10px' }}>{s.icon}</div>
-              <div style={{ fontSize: '34px', fontWeight: 900, color: '#d4af37', marginBottom: '5px' }}>{s.value}</div>
+              <div style={{ fontSize: '34px', fontWeight: 900, color: s.color, marginBottom: '5px' }}>{s.value}</div>
               <div style={{ color: '#999', fontSize: '11px', letterSpacing: '2px' }}>{s.label}</div>
             </div>
           ))}
@@ -252,10 +269,48 @@ export default function DashboardPage() {
           }}>🚪 خروج</button>
         </div>
 
+        {/* Tabs */}
+        <div style={{
+          display: 'flex',
+          gap: '8px',
+          marginBottom: '15px',
+          justifyContent: 'center',
+          borderBottom: '1px solid rgba(212,175,55,0.2)',
+          paddingBottom: '15px'
+        }}>
+          <button
+            onClick={() => setTab('active')}
+            style={{
+              padding: '10px 22px',
+              background: tab === 'active' ? 'linear-gradient(135deg, #d4af37, #f4d03f)' : 'transparent',
+              color: tab === 'active' ? '#0a0a0a' : '#d4af37',
+              border: tab === 'active' ? 'none' : '1px solid rgba(212,175,55,0.5)',
+              borderRadius: '10px',
+              fontWeight: 700,
+              fontSize: '13px',
+              cursor: 'pointer'
+            }}
+          >📋 النشطة ({total - banned})</button>
+
+          <button
+            onClick={() => setTab('banned')}
+            style={{
+              padding: '10px 22px',
+              background: tab === 'banned' ? 'linear-gradient(135deg, #c62828, #e57373)' : 'transparent',
+              color: tab === 'banned' ? '#fff' : '#e57373',
+              border: tab === 'banned' ? 'none' : '1px solid rgba(229,115,115,0.5)',
+              borderRadius: '10px',
+              fontWeight: 700,
+              fontSize: '13px',
+              cursor: 'pointer'
+            }}
+          >🚫 المحظورة ({banned})</button>
+        </div>
+
         {/* Table */}
         <div style={{
           background: 'linear-gradient(145deg, #0f0f0f, #1a1a1a)',
-          border: '2px solid rgba(212,175,55,0.4)',
+          border: tab === 'banned' ? '2px solid rgba(229,115,115,0.5)' : '2px solid rgba(212,175,55,0.4)',
           borderRadius: '20px',
           overflow: 'hidden'
         }}>
@@ -264,8 +319,12 @@ export default function DashboardPage() {
             borderBottom: '1px solid rgba(212,175,55,0.25)',
             textAlign: 'center'
           }}>
-            <h2 style={{ color: '#d4af37', fontSize: '20px', letterSpacing: '4px' }}>
-              ROYAL LICENSES
+            <h2 style={{
+              color: tab === 'banned' ? '#ef5350' : '#d4af37',
+              fontSize: '20px',
+              letterSpacing: '4px'
+            }}>
+              {tab === 'banned' ? '🚫 BANNED LICENSES' : 'ROYAL LICENSES'}
             </h2>
           </div>
 
@@ -275,11 +334,17 @@ export default function DashboardPage() {
             </div>
           ) : licenses.length === 0 ? (
             <div style={{ padding: '60px', textAlign: 'center', color: '#888' }}>
-              <div style={{ fontSize: '60px', marginBottom: '15px', opacity: 0.4 }}>📜</div>
-              <p style={{ marginBottom: '15px' }}>لا توجد مفاتيح بعد</p>
-              <a href="/dashboard/create" style={{ color: '#d4af37' }}>
-                ➕ أنشئ أول مفتاح
-              </a>
+              <div style={{ fontSize: '60px', marginBottom: '15px', opacity: 0.4 }}>
+                {tab === 'banned' ? '✅' : '📜'}
+              </div>
+              <p style={{ marginBottom: '15px' }}>
+                {tab === 'banned' ? 'لا توجد مفاتيح محظورة' : 'لا توجد مفاتيح بعد'}
+              </p>
+              {tab === 'active' && (
+                <a href="/dashboard/create" style={{ color: '#d4af37' }}>
+                  ➕ أنشئ أول مفتاح
+                </a>
+              )}
             </div>
           ) : (
             <div style={{ overflowX: 'auto' }}>
@@ -323,7 +388,7 @@ export default function DashboardPage() {
                           <Actions
                             licenseId={l.id}
                             isBanned={!!l.is_banned}
-                            onRefresh={loadLicenses}
+                            onRefresh={refresh}
                           />
                         </td>
                       </tr>
