@@ -1,10 +1,8 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
 
 export default function LoginPage() {
-  const router = useRouter()
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
@@ -27,7 +25,7 @@ export default function LoginPage() {
       if (data.success) {
         localStorage.setItem('panel_auth', 'true')
         localStorage.setItem('panel_user', data.username)
-        router.push('/dashboard')
+        window.location.href = '/dashboard'
       } else {
         setError(data.message || 'بيانات الدخول غير صحيحة')
       }
