@@ -28,13 +28,39 @@ export default function LoginPage() {
         localStorage.setItem('panel_role', data.role || 'admin')
         localStorage.setItem('panel_balance', String(data.balance || 0))
         window.location.href = '/dashboard'
-      } else {
-        if (data.banned) {
-          window.location.href = '/dashboard/banned'
-          return
-        }
-        setError(data.message || 'بيانات الدخول غير صحيحة')
+        return
       }
+
+      // 1. حذف من المطور
+      if (data.type === 'deleted' || data.deleted) {
+        localStorage.clear()
+        window.location.href = '/account-deleted'
+        return
+      }
+
+      // 2. انتهى الرصيد
+      if (data.type === 'no_balance') {
+        localStorage.clear()
+        window.location.href = '/no-balance'
+        return
+      }
+
+      // 3. إيقاف مؤقت
+      if (data.type === 'suspended') {
+        localStorage.clear()
+        window.location.href = '/suspended'
+        return
+      }
+
+      // 4. حظر عام
+      if (data.banned) {
+        localStorage.clear()
+        window.location.href = '/dashboard/banned'
+        return
+      }
+
+      // 5. خطأ عادي (بيانات خاطئة)
+      setError(data.message || 'بيانات الدخول غير صحيحة')
     } catch (err) {
       setError('خطأ في الاتصال بالسيرفر')
     } finally {
