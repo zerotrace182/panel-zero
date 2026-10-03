@@ -8,7 +8,6 @@ export default function AdminDistributorsPage() {
   const [showForm, setShowForm] = useState(false)
   const [editing, setEditing] = useState<any>(null)
   const [saving, setSaving] = useState(false)
-  const [uploading, setUploading] = useState(false)
   const [message, setMessage] = useState('')
 
   const [form, setForm] = useState({
@@ -69,35 +68,6 @@ export default function AdminDistributorsPage() {
     })
     setShowForm(true)
     setMessage('')
-  }
-
-  async function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
-    if (!file) return
-
-    setUploading(true)
-    setMessage('')
-
-    try {
-      const formData = new FormData()
-      formData.append('file', file)
-
-      const res = await fetch('/api/upload', {
-        method: 'POST',
-        body: formData,
-      })
-
-      const data = await res.json()
-      if (data.success) {
-        setForm({ ...form, image_url: data.url })
-        setMessage('✅ تم رفع الصورة')
-      } else {
-        setMessage('❌ ' + (data.message || 'فشل الرفع'))
-      }
-    } catch (err: any) {
-      setMessage('❌ ' + err.message)
-    }
-    setUploading(false)
   }
 
   async function handleSave() {
@@ -249,43 +219,32 @@ export default function AdminDistributorsPage() {
               style={inputStyle}
             />
 
-            <label style={labelStyle}>صورة الموزع</label>
+            <label style={labelStyle}>رابط صورة الموزع (اختياري)</label>
+            <input
+              type="text"
+              value={form.image_url}
+              onChange={(e) => setForm({ ...form, image_url: e.target.value })}
+              placeholder="https://example.com/image.jpg"
+              style={inputStyle}
+            />
+
             {form.image_url && (
-              <div style={{ marginBottom: '10px', textAlign: 'center' }}>
+              <div style={{ marginBottom: '15px', textAlign: 'center' }}>
                 <img
                   src={form.image_url}
                   alt="Preview"
                   style={{
-                    maxWidth: '150px',
-                    maxHeight: '150px',
+                    maxWidth: '120px',
+                    maxHeight: '120px',
                     borderRadius: '12px',
                     border: '2px solid #d4af37'
                   }}
+                  onError={(e: any) => { e.target.style.display = 'none' }}
                 />
+                <p style={{ color: '#888', fontSize: '10px', marginTop: '5px' }}>
+                  معاينة الصورة
+                </p>
               </div>
-            )}
-
-            <input
-              type="file"
-              accept="image/*"
-              onChange={handleUpload}
-              disabled={uploading}
-              style={{
-                width: '100%',
-                padding: '10px',
-                background: '#0a0a0a',
-                border: '1px solid rgba(212,175,55,0.4)',
-                borderRadius: '10px',
-                color: '#e8e8e8',
-                fontSize: '13px',
-                marginBottom: '15px',
-                boxSizing: 'border-box'
-              }}
-            />
-            {uploading && (
-              <p style={{ color: '#f4d03f', fontSize: '12px', marginBottom: '15px' }}>
-                ⏳ جاري الرفع...
-              </p>
             )}
 
             <label style={labelStyle}>رابط تيليجرام</label>
@@ -408,6 +367,7 @@ export default function AdminDistributorsPage() {
                       objectFit: 'cover',
                       border: '2px solid #d4af37'
                     }}
+                    onError={(e: any) => { e.target.style.display = 'none' }}
                   />
                 ) : (
                   <div style={{
