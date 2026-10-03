@@ -10,6 +10,7 @@ export default function DashboardPage() {
   const [licenses, setLicenses] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [username, setUsername] = useState('')
+  const [error, setError] = useState('')
 
   useEffect(() => {
     const auth = localStorage.getItem('panel_auth')
@@ -23,12 +24,23 @@ export default function DashboardPage() {
 
   async function loadLicenses() {
     setLoading(true)
-    const { data, error } = await supabase
-      .from('licenses')
-      .select('*')
-      .order('id', { ascending: false })
+    setError('')
+    try {
+      const { data, error } = await supabase
+        .from('licenses')
+        .select('*')
+        .order('id', { ascending: false })
 
-    if (data) setLicenses(data)
+      if (error) {
+        setError(error.message)
+        setLicenses([])
+      } else {
+        setLicenses(data || [])
+      }
+    } catch (e: any) {
+      setError(e.message)
+      setLicenses([])
+    }
     setLoading(false)
   }
 
@@ -38,14 +50,23 @@ export default function DashboardPage() {
     router.push('/login')
   }
 
+  const safeDate = (d: any) => {
+    if (!d) return null
+    const date = new Date(d)
+    if (isNaN(date.getTime())) return null
+    return date
+  }
+
   const total = licenses.length
-  const active = licenses.filter(l => 
-    new Date(l.expires_at) > new Date() && l.is_active && !l.is_banned
-  ).length
-  const expired = licenses.filter(l => 
-    new Date(l.expires_at) <= new Date()
-  ).length
-  const banned = licenses.filter(l => l.is_banned).length
+  const active = licenses.filter(l => {
+    const exp = safeDate(l?.expires_at)
+    return exp && exp > new Date() && l?.is_active && !l?.is_banned
+  }).length
+  const expired = licenses.filter(l => {
+    const exp = safeDate(l?.expires_at)
+    return exp && exp <= new Date()
+  }).length
+  const banned = licenses.filter(l => l?.is_banned).length
 
   return (
     <main className="royal-bg" style={{ minHeight: '100vh', padding: '25px 15px' }}>
@@ -91,6 +112,20 @@ export default function DashboardPage() {
             PREMIUM LICENSE MANAGEMENT
           </p>
         </div>
+
+        {/* Error */}
+        {error && (
+          <div style={{
+            background: 'rgba(229,115,115,0.15)',
+            border: '1px solid rgba(229,115,115,0.5)',
+            color: '#ef5350',
+            padding: '15px',
+            borderRadius: '10px',
+            marginBottom: '20px',
+            textAlign: 'center',
+            fontSize: '13px'
+          }}>⚠️ {error}</div>
+        )}
 
         {/* Stats */}
         <div style={{
@@ -181,29 +216,31 @@ export default function DashboardPage() {
                 </thead>
                 <tbody>
                   {licenses.map((l) => {
-                    const isActive = new Date(l.expires_at) > new Date() && l.is_active && !l.is_banned
+                    const exp = safeDate(l?.expires_at)
+                    const isActive = exp && exp > new Date() && l?.is_active && !l?.is_banned
+                    const key = l?.license_key || '—'
                     return (
-                      <tr key={l.id} style={{ borderBottom: '1px solid rgba(212,175,55,0.1)' }}>
+                      <tr key={l?.id || Math.random()} style={{ borderBottom: '1px solid rgba(212,175,55,0.1)' }}>
                         <td style={{ padding: '14px 10px', fontSize: '11px', fontFamily: 'monospace', color: '#f4d03f' }}>
-                          {l.license_key.substring(0, 20)}...
+                          {String(key).substring(0, 20)}...
                         </td>
                         <td style={{ padding: '14px 10px', fontSize: '12px', color: '#ccc' }}>
-                          {l.duration_type}
+                          {l?.duration_type || '—'}
                         </td>
                         <td style={{ padding: '14px 10px', fontSize: '11px', color: '#999' }}>
-                          {new Date(l.expires_at).toLocaleDateString('ar')}
+                          {exp ? exp.toLocaleDateString('ar') : '—'}
                         </td>
                         <td style={{
                           padding: '14px 10px',
                           fontSize: '12px',
-                          color: l.is_banned ? '#ef5350' : (isActive ? '#66bb6a' : '#ffa726')
+                          color: l?.is_banned ? '#ef5350' : (isActive ? '#66bb6a' : '#ffa726')
                         }}>
-                          {l.is_banned ? '🚫' : (isActive ? '✅' : '⏰')}
+                          {l?.is_banned ? '🚫' : (isActive ? '✅' : '⏰')}
                         </td>
                         <td style={{ padding: '10px 6px' }}>
                           <Actions 
-                            licenseId={l.id} 
-                            isBanned={l.is_banned} 
+                            licenseId={l?.id} 
+                            isBanned={!!l?.is_banned} 
                             onRefresh={loadLicenses} 
                           />
                         </td>
