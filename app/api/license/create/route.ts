@@ -29,16 +29,54 @@ export async function POST(request: Request) {
     const numDevices = Math.max(parseInt(devices) || 1, 1)
 
     // 1. سعر النوع
-    const { data: priceRow } = await supabaseAdmin
+    const { data: typePriceRow } = await supabaseAdmin
       .from('key_prices')
       .select('price')
       .eq('duration_type', type)
       .maybeSingle()
 
-    const pricePerKey = parseFloat(priceRow?.price || 1)
+    const typePrice = parseFloat(typePriceRow?.price || 1)
+
+    // 2. سعر الأجهزة
+    const { data: devicePriceRow } = await supabaseAdmin
+      .from('device_prices')
+      .select('price')
+      .eq('device_count', numDevices)
+      .maybeSingle()
+
+    // إذا لم يكن هناك سعر محدد، نستخدم أعلى سعر أقرب عدد
+    let devicePrice = 0
+    if (devicePriceRow) {
+      devicePrice = parseFloat(devicePriceRow.price)
+    } else {
+      // جلب أقرب سعر أقل
+      const { data: closest } = await supabaseAdmin
+        .from('device_prices')
+        .select('device_count, price')
+        .lte('device_count', numDevices)
+        .order('device_count', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+
+      if (closest) {
+        devicePrice = parseFloat(closest.price)
+      } else {
+        // إذا لم يوجد أي سعر، استخدم الأدنى
+        const { data: lowest } = await supabaseAdmin
+          .from('device_prices')
+          .select('price')
+          .order('device_count', { ascending: true })
+          .limit(1)
+          .maybeSingle()
+        devicePrice = parseFloat(lowest?.price || 1)
+      }
+    }
+
+    // 3. السعر الإجمالي للكود الواحد
+    const pricePerKey = typePrice + devicePrice
     const totalCost = pricePerKey * numCount
 
-    // 2. جلب المستخدم
+    // 4. جلب المستخدم
     let user: any = null
     let isDistributor = false
 
@@ -54,7 +92,6 @@ export async function POST(request: Request) {
       if (user && (user.role === 'distributor' || user.role === 'owner')) {
         isDistributor = true
 
-        // 3. تعطيل الحساب إن كان معطل
         if (!user.is_active) {
           return NextResponse.json(
             {
@@ -67,9 +104,7 @@ export async function POST(request: Request) {
           )
         }
 
-        // 4. الرصيد غير كافٍ — طرد
         if (parseFloat(user.balance || 0) < totalCost) {
-          // تعطيل الحساب
           await supabaseAdmin
             .from('users')
             .update({
@@ -128,7 +163,7 @@ export async function POST(request: Request) {
 
       await supabaseAdmin.from('activity_log').insert({
         action: 'CREATE',
-        details: `إنشاء مفتاح (${type}) - $${pricePerKey}`,
+        details: `إنشاء مفتاح (${type}) - ${numDevices} جهاز - $${pricePerKey}`,
         ip_address: request.headers.get('x-forwarded-for') || 'unknown',
       })
     }
@@ -147,7 +182,7 @@ export async function POST(request: Request) {
         user_id: user.id,
         amount: -actualCost,
         type: 'purchase',
-        description: `شراء ${keys.length} مفتاح (${type})`,
+        description: `شراء ${keys.length} مفتاح (${type}، ${numDevices} جهاز)`,
       })
     }
 
@@ -157,6 +192,9 @@ export async function POST(request: Request) {
       keys,
       expires: expires.toISOString(),
       cost: isDistributor ? pricePerKey * keys.length : 0,
+      price_per_key: pricePerKey,
+      type_price: typePrice,
+      device_price: devicePrice,
     })
   } catch (error: any) {
     return NextResponse.json(
