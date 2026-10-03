@@ -7,6 +7,8 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [username, setUsername] = useState('')
+  const [userRole, setUserRole] = useState('admin')
+  const [userBalance, setUserBalance] = useState(0)
 
   useEffect(() => {
     const auth = localStorage.getItem('panel_auth')
@@ -15,6 +17,8 @@ export default function DashboardPage() {
       return
     }
     setUsername(localStorage.getItem('panel_user') || 'admin')
+    setUserRole(localStorage.getItem('panel_role') || 'admin')
+    setUserBalance(parseFloat(localStorage.getItem('panel_balance') || '0'))
     loadLicenses()
   }, [])
 
@@ -40,6 +44,8 @@ export default function DashboardPage() {
   function handleLogout() {
     localStorage.removeItem('panel_auth')
     localStorage.removeItem('panel_user')
+    localStorage.removeItem('panel_role')
+    localStorage.removeItem('panel_balance')
     window.location.href = '/login'
   }
 
@@ -56,15 +62,19 @@ export default function DashboardPage() {
   }).length
   const banned = licenses.filter(l => l.is_banned).length
 
+  const isAdmin = userRole === 'admin' || userRole === 'owner'
+
   return (
     <main style={{
       minHeight: '100vh',
       background: '#050505',
+      backgroundImage: 'radial-gradient(ellipse at top left, rgba(212,175,55,.08) 0%, transparent 45%), radial-gradient(ellipse at bottom right, rgba(212,175,55,.08) 0%, transparent 45%)',
       color: '#e8e8e8',
       padding: '25px 15px'
     }}>
       <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
 
+        {/* Header */}
         <div style={{
           background: 'linear-gradient(145deg, #0f0f0f, #1a1a1a)',
           border: '2px solid #d4af37',
@@ -72,7 +82,8 @@ export default function DashboardPage() {
           padding: '35px 25px 30px',
           marginBottom: '30px',
           position: 'relative',
-          textAlign: 'center'
+          textAlign: 'center',
+          boxShadow: '0 15px 50px rgba(0,0,0,0.8), 0 0 60px rgba(212,175,55,0.15)'
         }}>
           <div style={{
             position: 'absolute',
@@ -84,7 +95,24 @@ export default function DashboardPage() {
             fontSize: '12px',
             padding: '8px 16px',
             borderRadius: '30px'
-          }}>👤 {username}</div>
+          }}>
+            👤 {username} <span style={{ color: '#999', fontSize: '10px' }}>({userRole})</span>
+          </div>
+
+          {userBalance > 0 && (
+            <div style={{
+              position: 'absolute',
+              top: '20px',
+              right: '25px',
+              background: 'rgba(76,175,80,0.15)',
+              border: '1px solid rgba(76,175,80,0.5)',
+              color: '#66bb6a',
+              fontSize: '13px',
+              padding: '8px 16px',
+              borderRadius: '30px',
+              fontWeight: 700
+            }}>💰 ${userBalance}</div>
+          )}
 
           <div style={{ fontSize: '52px' }}>👑</div>
 
@@ -100,6 +128,7 @@ export default function DashboardPage() {
           </p>
         </div>
 
+        {/* Error */}
         {error && (
           <div style={{
             background: 'rgba(229,115,115,0.15)',
@@ -112,6 +141,7 @@ export default function DashboardPage() {
           }}>⚠️ {error}</div>
         )}
 
+        {/* Stats */}
         <div style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
@@ -138,6 +168,7 @@ export default function DashboardPage() {
           ))}
         </div>
 
+        {/* Actions */}
         <div style={{
           display: 'flex',
           flexWrap: 'wrap',
@@ -155,6 +186,34 @@ export default function DashboardPage() {
             fontWeight: 700,
             fontSize: '14px'
           }}>✦ إنشاء مفتاح ✦</a>
+
+          {isAdmin && (
+            <>
+              <a href="/dashboard/invites" style={{
+                display: 'inline-block',
+                padding: '14px 26px',
+                background: 'transparent',
+                color: '#d4af37',
+                border: '1px solid rgba(212,175,55,0.6)',
+                textDecoration: 'none',
+                borderRadius: '10px',
+                fontWeight: 700,
+                fontSize: '14px'
+              }}>🎫 الرموز</a>
+
+              <a href="/dashboard/users" style={{
+                display: 'inline-block',
+                padding: '14px 26px',
+                background: 'transparent',
+                color: '#d4af37',
+                border: '1px solid rgba(212,175,55,0.6)',
+                textDecoration: 'none',
+                borderRadius: '10px',
+                fontWeight: 700,
+                fontSize: '14px'
+              }}>👥 المستخدمين</a>
+            </>
+          )}
 
           <a href="/dashboard/charts" style={{
             display: 'inline-block',
@@ -192,6 +251,7 @@ export default function DashboardPage() {
           }}>🚪 خروج</button>
         </div>
 
+        {/* Table */}
         <div style={{
           background: 'linear-gradient(145deg, #0f0f0f, #1a1a1a)',
           border: '2px solid rgba(212,175,55,0.4)',
