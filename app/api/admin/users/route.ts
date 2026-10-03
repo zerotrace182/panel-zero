@@ -1,12 +1,13 @@
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 
-// GET — عرض كل المستخدمين
+// GET — عرض الموزعين فقط (بدون Admin/Owner)
 export async function GET() {
   try {
     const { data, error } = await supabaseAdmin
       .from('users')
       .select('id, username, role, balance, is_active, invited_by, key_price, created_at, banned_at, ban_reason')
+      .eq('role', 'distributor')
       .order('id', { ascending: false })
 
     if (error) {
@@ -105,7 +106,6 @@ export async function PATCH(request: Request) {
         )
       }
 
-      // جلب الرصيد الحالي
       const { data: user } = await supabaseAdmin
         .from('users')
         .select('balance')
@@ -219,10 +219,16 @@ export async function DELETE(request: Request) {
       )
     }
 
-    // منع حذف admin الأساسي
-    if (id === '1') {
+    // جلب المستخدم للتأكد من دوره
+    const { data: user } = await supabaseAdmin
+      .from('users')
+      .select('role')
+      .eq('id', id)
+      .maybeSingle()
+
+    if (user && (user.role === 'admin' || user.role === 'owner')) {
       return NextResponse.json(
-        { success: false, message: 'لا يمكن حذف الحساب الرئيسي' },
+        { success: false, message: 'لا يمكن حذف حساب المدير أو المالك' },
         { status: 400 }
       )
     }
