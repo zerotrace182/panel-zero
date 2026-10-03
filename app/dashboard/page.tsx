@@ -288,6 +288,7 @@ export default function DashboardPage() {
                     <th style={{ background: 'rgba(212,175,55,0.1)', color: '#f4d03f', padding: '14px 10px', textAlign: 'right', fontSize: '11px' }}>KEY</th>
                     <th style={{ background: 'rgba(212,175,55,0.1)', color: '#f4d03f', padding: '14px 10px', textAlign: 'right', fontSize: '11px' }}>TYPE</th>
                     <th style={{ background: 'rgba(212,175,55,0.1)', color: '#f4d03f', padding: '14px 10px', textAlign: 'right', fontSize: '11px' }}>EXPIRES</th>
+                    <th style={{ background: 'rgba(212,175,55,0.1)', color: '#f4d03f', padding: '14px 10px', textAlign: 'right', fontSize: '11px' }}>DEVICES</th>
                     <th style={{ background: 'rgba(212,175,55,0.1)', color: '#f4d03f', padding: '14px 10px', textAlign: 'right', fontSize: '11px' }}>STATUS</th>
                   </tr>
                 </thead>
@@ -305,6 +306,9 @@ export default function DashboardPage() {
                         </td>
                         <td style={{ padding: '14px 10px', fontSize: '11px', color: '#999' }}>
                           {exp && !isNaN(exp.getTime()) ? exp.toLocaleDateString('ar') : '—'}
+                        </td>
+                        <td style={{ padding: '14px 10px', fontSize: '12px', color: '#d4af37', fontFamily: 'monospace' }}>
+                          {l.device_count || 0} / {l.max_devices || 1}
                         </td>
                         <td style={{
                           padding: '14px 10px',
