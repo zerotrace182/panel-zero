@@ -40,6 +40,13 @@ export default function CreateKeyPage() {
 
       const data = await res.json()
 
+      // إذا تم طرد الحساب
+      if (data.banned) {
+        localStorage.clear()
+        window.location.href = '/dashboard/banned'
+        return
+      }
+
       if (data.success) {
         setKeys(data.keys || [])
         setCost(data.cost || 0)
