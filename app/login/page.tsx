@@ -25,6 +25,8 @@ export default function LoginPage() {
       if (data.success) {
         localStorage.setItem('panel_auth', 'true')
         localStorage.setItem('panel_user', data.username)
+        localStorage.setItem('panel_role', data.role || 'admin')
+        localStorage.setItem('panel_balance', String(data.balance || 0))
         window.location.href = '/dashboard'
       } else {
         setError(data.message || 'بيانات الدخول غير صحيحة')
@@ -162,11 +164,39 @@ export default function LoginPage() {
           </button>
         </form>
 
+        <div style={{
+          textAlign: 'center',
+          marginTop: '25px',
+          paddingTop: '20px',
+          borderTop: '1px solid rgba(212,175,55,0.2)'
+        }}>
+          <p style={{ color: '#888', fontSize: '12px', marginBottom: '12px' }}>
+            ليس لديك حساب؟
+          </p>
+          <a
+            href="/register"
+            style={{
+              display: 'inline-block',
+              padding: '12px 30px',
+              background: 'transparent',
+              color: '#f4d03f',
+              border: '1px solid rgba(212,175,55,0.6)',
+              borderRadius: '10px',
+              textDecoration: 'none',
+              fontSize: '13px',
+              letterSpacing: '2px',
+              fontWeight: 700
+            }}
+          >
+            ✨ إنشاء حساب جديد
+          </a>
+        </div>
+
         <p style={{
           textAlign: 'center',
           color: '#555',
           fontSize: '10px',
-          marginTop: '30px',
+          marginTop: '25px',
           letterSpacing: '4px'
         }}>SECURE ACCESS · MMXXVI</p>
       </div>
