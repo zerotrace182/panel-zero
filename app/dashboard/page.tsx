@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import Actions from './actions'
 
 export default function DashboardPage() {
   const [licenses, setLicenses] = useState<any[]>([])
@@ -290,6 +291,7 @@ export default function DashboardPage() {
                     <th style={{ background: 'rgba(212,175,55,0.1)', color: '#f4d03f', padding: '14px 10px', textAlign: 'right', fontSize: '11px' }}>EXPIRES</th>
                     <th style={{ background: 'rgba(212,175,55,0.1)', color: '#f4d03f', padding: '14px 10px', textAlign: 'right', fontSize: '11px' }}>DEVICES</th>
                     <th style={{ background: 'rgba(212,175,55,0.1)', color: '#f4d03f', padding: '14px 10px', textAlign: 'right', fontSize: '11px' }}>STATUS</th>
+                    <th style={{ background: 'rgba(212,175,55,0.1)', color: '#f4d03f', padding: '14px 10px', textAlign: 'right', fontSize: '11px' }}>ACTIONS</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -316,6 +318,13 @@ export default function DashboardPage() {
                           color: l.is_banned ? '#ef5350' : (isActive ? '#66bb6a' : '#ffa726')
                         }}>
                           {l.is_banned ? '🚫 محظور' : (isActive ? '✅ نشط' : '⏰ منتهي')}
+                        </td>
+                        <td style={{ padding: '10px 6px' }}>
+                          <Actions
+                            licenseId={l.id}
+                            isBanned={!!l.is_banned}
+                            onRefresh={loadLicenses}
+                          />
                         </td>
                       </tr>
                     )
