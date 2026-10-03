@@ -28,7 +28,7 @@ export async function POST(request: Request) {
     const numCount = Math.min(Math.max(parseInt(count) || 1, 1), 50)
     const numDevices = Math.max(parseInt(devices) || 1, 1)
 
-    // 1. جلب سعر النوع
+    // 1. سعر النوع
     const { data: priceRow } = await supabaseAdmin
       .from('key_prices')
       .select('price')
@@ -54,26 +54,51 @@ export async function POST(request: Request) {
       if (user && (user.role === 'distributor' || user.role === 'owner')) {
         isDistributor = true
 
+        // 3. تعطيل الحساب إن كان معطل
         if (!user.is_active) {
           return NextResponse.json(
-            { success: false, message: 'حسابك معطل، تواصل مع الإدارة' },
+            {
+              success: false,
+              message: 'حسابك معطل',
+              banned: true,
+              telegram: 'https://t.me/op_mf',
+            },
             { status: 403 }
           )
         }
 
+        // 4. الرصيد غير كافٍ — طرد
         if (parseFloat(user.balance || 0) < totalCost) {
+          // تعطيل الحساب
+          await supabaseAdmin
+            .from('users')
+            .update({
+              is_active: false,
+              banned_at: new Date().toISOString(),
+              ban_reason: 'انتهى الرصيد',
+            })
+            .eq('id', user.id)
+
+          await supabaseAdmin.from('activity_log').insert({
+            action: 'AUTO_BAN',
+            details: `تعطيل تلقائي: ${username} - الرصيد غير كافٍ`,
+            ip_address: request.headers.get('x-forwarded-for') || 'unknown',
+          })
+
           return NextResponse.json(
             {
               success: false,
-              message: `رصيدك غير كافٍ. تحتاج $${totalCost.toFixed(2)}، متوفر $${parseFloat(user.balance || 0).toFixed(2)}`,
+              message: 'انتهى رصيدك، تم تعطيل حسابك',
+              banned: true,
+              telegram: 'https://t.me/op_mf',
             },
-            { status: 400 }
+            { status: 403 }
           )
         }
       }
     }
 
-    // 3. توليد المفاتيح
+    // 5. توليد المفاتيح
     const expires = new Date()
     expires.setDate(expires.getDate() + days)
 
@@ -108,7 +133,7 @@ export async function POST(request: Request) {
       })
     }
 
-    // 4. خصم الرصيد
+    // 6. خصم الرصيد
     if (isDistributor && user && keys.length > 0) {
       const actualCost = pricePerKey * keys.length
       const newBalance = parseFloat(user.balance || 0) - actualCost
