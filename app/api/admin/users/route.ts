@@ -206,7 +206,7 @@ export async function PATCH(request: Request) {
   }
 }
 
-// DELETE — حذف مستخدم
+// DELETE — حذف ناعم للمستخدم (تعطيل + سبب "تم الحذف من قبل المطور")
 export async function DELETE(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
@@ -219,23 +219,36 @@ export async function DELETE(request: Request) {
       )
     }
 
-    // جلب المستخدم للتأكد من دوره
+    // جلب المستخدم
     const { data: user } = await supabaseAdmin
       .from('users')
-      .select('role')
+      .select('id, username, role')
       .eq('id', id)
       .maybeSingle()
 
-    if (user && (user.role === 'admin' || user.role === 'owner')) {
+    if (!user) {
+      return NextResponse.json(
+        { success: false, message: 'المستخدم غير موجود' },
+        { status: 404 }
+      )
+    }
+
+    // حماية Admin/Owner
+    if (user.role === 'admin' || user.role === 'owner') {
       return NextResponse.json(
         { success: false, message: 'لا يمكن حذف حساب المدير أو المالك' },
         { status: 400 }
       )
     }
 
+    // ✅ الحذف الناعم: تعطيل بدل حذف فعلي
     const { error } = await supabaseAdmin
       .from('users')
-      .delete()
+      .update({
+        is_active: false,
+        banned_at: new Date().toISOString(),
+        ban_reason: 'تم الحذف من قبل المطور',
+      })
       .eq('id', id)
 
     if (error) {
@@ -245,7 +258,16 @@ export async function DELETE(request: Request) {
       )
     }
 
-    return NextResponse.json({ success: true, message: 'تم الحذف' })
+    await supabaseAdmin.from('activity_log').insert({
+      action: 'DELETE_USER',
+      details: `حذف مستخدم: ${user.username}`,
+      ip_address: 'web',
+    })
+
+    return NextResponse.json({
+      success: true,
+      message: 'تم حذف المستخدم',
+    })
   } catch (err: any) {
     return NextResponse.json(
       { success: false, message: err.message },
