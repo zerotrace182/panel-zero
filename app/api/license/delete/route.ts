@@ -12,19 +12,19 @@ export async function POST(request: Request) {
       )
     }
 
-    // حذف الأجهزة المرتبطة أولاً
+    // 1. حذف الأجهزة المرتبطة
     await supabaseAdmin
       .from('devices')
       .delete()
       .eq('license_id', license_id)
 
-    // حذف سجل الأحداث
+    // 2. حذف سجل الأحداث المرتبط
     await supabaseAdmin
       .from('activity_log')
       .delete()
       .eq('license_id', license_id)
 
-    // حذف المفتاح
+    // 3. حذف المفتاح
     const { error } = await supabaseAdmin
       .from('licenses')
       .delete()
