@@ -30,7 +30,7 @@ export async function GET() {
   }
 }
 
-// PATCH — تعديل مستخدم (تفعيل/تعطيل/رصيد)
+// PATCH — تعديل مستخدم (تفعيل/إيقاف مؤقت/رصيد)
 export async function PATCH(request: Request) {
   try {
     const body = await request.json()
@@ -70,14 +70,14 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ success: true, message: 'تم التفعيل' })
     }
 
-    // 2. تعطيل المستخدم
+    // 2. إيقاف مؤقت (Suspend)
     if (action === 'deactivate') {
       const { error } = await supabaseAdmin
         .from('users')
         .update({
           is_active: false,
           banned_at: new Date().toISOString(),
-          ban_reason: 'تم التعطيل من قبل الإدارة',
+          ban_reason: 'إيقاف مؤقت',
         })
         .eq('id', user_id)
 
@@ -89,12 +89,12 @@ export async function PATCH(request: Request) {
       }
 
       await supabaseAdmin.from('activity_log').insert({
-        action: 'DEACTIVATE_USER',
-        details: `تعطيل مستخدم #${user_id}`,
+        action: 'SUSPEND_USER',
+        details: `إيقاف مؤقت لمستخدم #${user_id}`,
         ip_address: 'web',
       })
 
-      return NextResponse.json({ success: true, message: 'تم التعطيل' })
+      return NextResponse.json({ success: true, message: 'تم الإيقاف المؤقت' })
     }
 
     // 3. إضافة رصيد
