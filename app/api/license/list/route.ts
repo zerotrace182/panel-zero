@@ -16,6 +16,7 @@ export async function GET() {
       )
     }
 
+    // حساب عدد الأجهزة لكل مفتاح
     const licensesWithDevices = await Promise.all(
       (data || []).map(async (l) => {
         const { count } = await supabaseAdmin
