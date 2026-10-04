@@ -361,7 +361,7 @@ export default function AdminDashboardPage() {
                     <th style={{ background: 'rgba(212,175,55,0.1)', color: '#f4d03f', padding: '14px 10px', textAlign: 'right', fontSize: '11px' }}>KEY</th>
                     <th style={{ background: 'rgba(212,175,55,0.1)', color: '#f4d03f', padding: '14px 10px', textAlign: 'right', fontSize: '11px' }}>TYPE</th>
                     <th style={{ background: 'rgba(212,175,55,0.1)', color: '#f4d03f', padding: '14px 10px', textAlign: 'right', fontSize: '11px' }}>EXPIRES</th>
-                    <th style={{ background: 'rgba(212,175,55,0.1)', color: '#f4d03f', padding: '14px 10px', textAlign: 'right', fontSize: '11px' }}>DEVICES</th>
+                    <th style={{ background: 'rgba(212,175,55,0.1)', color: '#f4d03f', padding: '14px 10px', textAlign: 'right', fontSize: '11px' }}>USED / LIMIT</th>
                     <th style={{ background: 'rgba(212,175,55,0.1)', color: '#f4d03f', padding: '14px 10px', textAlign: 'right', fontSize: '11px' }}>STATUS</th>
                     <th style={{ background: 'rgba(212,175,55,0.1)', color: '#f4d03f', padding: '14px 10px', textAlign: 'right', fontSize: '11px' }}>ACTIONS</th>
                   </tr>
@@ -370,6 +370,9 @@ export default function AdminDashboardPage() {
                   {licenses.map((l, i) => {
                     const exp = l.expires_at ? new Date(l.expires_at) : null
                     const isActive = exp && !isNaN(exp.getTime()) && exp > new Date() && l.is_active && !l.is_banned
+                    const used = l.used_count || 0
+                    const limit = l.max_devices || 1
+                    const isFull = used >= limit
                     return (
                       <tr key={l.id || i} style={{ borderBottom: '1px solid rgba(212,175,55,0.1)' }}>
                         <td style={{ padding: '14px 10px', fontSize: '11px', fontFamily: 'monospace', color: '#f4d03f' }}>
@@ -381,8 +384,32 @@ export default function AdminDashboardPage() {
                         <td style={{ padding: '14px 10px', fontSize: '11px', color: '#999' }}>
                           {exp && !isNaN(exp.getTime()) ? exp.toLocaleDateString('ar') : '—'}
                         </td>
-                        <td style={{ padding: '14px 10px', fontSize: '12px', color: '#d4af37', fontFamily: 'monospace' }}>
-                          {l.device_count || 0} / {l.max_devices || 1}
+                        <td style={{ padding: '14px 10px', fontSize: '12px', fontFamily: 'monospace' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', justifyContent: 'flex-end' }}>
+                            <span style={{
+                              color: isFull ? '#ef5350' : '#66bb6a',
+                              fontWeight: 700
+                            }}>
+                              {used.toLocaleString('en')} / {limit.toLocaleString('en')}
+                            </span>
+                            <div style={{
+                              width: '60px',
+                              height: '6px',
+                              background: 'rgba(255,255,255,0.1)',
+                              borderRadius: '3px',
+                              overflow: 'hidden',
+                              direction: 'ltr'
+                            }}>
+                              <div style={{
+                                height: '100%',
+                                width: `${Math.min(100, (used / limit) * 100)}%`,
+                                background: isFull
+                                  ? 'linear-gradient(90deg, #ef5350, #ff8a80)'
+                                  : 'linear-gradient(90deg, #d4af37, #f4d03f)',
+                                transition: 'width 0.3s'
+                              }} />
+                            </div>
+                          </div>
                         </td>
                         <td style={{
                           padding: '14px 10px',
