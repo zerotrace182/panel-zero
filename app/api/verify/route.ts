@@ -51,7 +51,7 @@ export async function POST(request: Request) {
       )
     }
 
-    // ✅ نستخدم used_count مباشرة بدل عدّ الصفوف (أسرع بآلاف المرات)
+    // ✅ نستخدم used_count مباشرة
     let activeDevices = lic.used_count || 0
 
     // التحقق من الجهاز
@@ -63,7 +63,7 @@ export async function POST(request: Request) {
       .maybeSingle()
 
     if (!existingDevice) {
-      // ✅ الحد الأقصى = max_devices
+      // ✅ الحد الأقصى
       const userLimit = lic.max_devices ?? 1
 
       if (activeDevices >= userLimit) {
