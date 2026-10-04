@@ -10,9 +10,8 @@ export async function GET(request: Request) {
       .from('licenses')
       .select('*')
       .order('id', { ascending: false })
-      .limit(500)
+      .limit(1000)
 
-    // فلترة
     if (filter === 'active') {
       query = query.eq('is_banned', false)
     } else if (filter === 'banned') {
@@ -28,25 +27,17 @@ export async function GET(request: Request) {
       )
     }
 
-    // حساب عدد الأجهزة
-    const licensesWithDevices = await Promise.all(
-      (data || []).map(async (l) => {
-        const { count } = await supabaseAdmin
-          .from('devices')
-          .select('*', { count: 'exact', head: true })
-          .eq('license_id', l.id)
-
-        return {
-          ...l,
-          device_count: count || 0,
-        }
-      })
-    )
+    // ✅ نضيف used_count مباشرة بدون استعلامات إضافية
+    const licenses = (data || []).map((l) => ({
+      ...l,
+      used_count: l.used_count ?? 0,
+      device_count: l.used_count ?? 0, // للتوافق مع الواجهة القديمة
+    }))
 
     return NextResponse.json({
       status: 'success',
-      count: licensesWithDevices.length,
-      licenses: licensesWithDevices,
+      count: licenses.length,
+      licenses,
     })
   } catch (err: any) {
     return NextResponse.json(
