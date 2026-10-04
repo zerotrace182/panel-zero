@@ -25,10 +25,10 @@ export async function POST(request: Request) {
       )
     }
 
-    // ✅ رفعنا الحد من 50 إلى 5000 (عشان تنشئ أكواد كثيرة دفعة وحدة)
+    // ✅ رفعنا الحد من 50 إلى 5000
     const numCount = Math.min(Math.max(parseInt(count) || 1, 1), 5000)
 
-    // ✅ عدد الأجهزة: بدون حد أقصى (تقدر تحط 1000 أو 100000)
+    // ✅ عدد الأجهزة: بدون حد أقصى
     const numDevices = Math.max(parseInt(devices) || 1, 1)
 
     // 1. سعر النوع
@@ -194,7 +194,7 @@ export async function POST(request: Request) {
         duration_type: type,
         duration_value: 1,
         max_devices: numDevices,
-        used_count: 0, // ✅ عداد الأجهزة المستخدمة يبدأ من صفر
+        used_count: 0, // ✅ العداد يبدأ من صفر
         expires_at: expires.toISOString(),
         is_active: true,
         is_banned: false,
