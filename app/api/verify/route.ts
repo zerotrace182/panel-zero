@@ -51,15 +51,39 @@ export async function POST(request: Request) {
       )
     }
 
-    // ✅ نستخدم used_count مباشرة
-    let activeDevices = lic.used_count || 0
+    // ✅ جلب IP الحقيقي (يدعم Cloudflare + بروكسيات)
+    const forwarded = request.headers.get('x-forwarded-for')
+    const clientIp =
+      request.headers.get('cf-connecting-ip') ||         // Cloudflare
+      request.headers.get('x-real-ip') ||
+      (forwarded ? forwarded.split(',')[0].trim() : null) ||
+      'unknown'
+
+    // ✅ لو hwid = اسم حزمة التطبيق (غير فريد)، نستخدم IP بدل منه
+    const isGenericHwid =
+      !hwid ||
+      hwid === 'default' ||
+      hwid === 'unknown' ||
+      hwid.startsWith('com.') ||
+      hwid.startsWith('net.') ||
+      hwid.startsWith('org.')
+
+    const deviceKey = isGenericHwid ? `ip-${clientIp}` : hwid
+
+    // ✅ نحسب العداد من جدول devices مباشرة (مضمون أكثر من used_count)
+    const { count: currentCount } = await supabaseAdmin
+      .from('devices')
+      .select('*', { count: 'exact', head: true })
+      .eq('license_id', lic.id)
+
+    let activeDevices = currentCount || 0
 
     // التحقق من الجهاز
     const { data: existingDevice } = await supabaseAdmin
       .from('devices')
       .select('*')
       .eq('license_id', lic.id)
-      .eq('hwid', hwid)
+      .eq('hwid', deviceKey)
       .maybeSingle()
 
     if (!existingDevice) {
@@ -79,25 +103,24 @@ export async function POST(request: Request) {
       // سجل الجهاز الجديد
       await supabaseAdmin.from('devices').insert({
         license_id: lic.id,
-        hwid: hwid,
-        ip_address: request.headers.get('x-forwarded-for') || 'unknown',
+        hwid: deviceKey,
+        ip_address: clientIp,
       })
 
-      // ✅ زيد العداد
-      const newCount = activeDevices + 1
+      activeDevices += 1
+
+      // ✅ نحدث العداد أيضاً (احتياط، لو التريجر ما اشتغل)
       await supabaseAdmin
         .from('licenses')
-        .update({ used_count: newCount })
+        .update({ used_count: activeDevices })
         .eq('id', lic.id)
-
-      activeDevices = newCount
     } else {
       // جهاز موجود → حدّث آخر ظهور فقط
       await supabaseAdmin
         .from('devices')
         .update({
           last_seen: new Date().toISOString(),
-          ip_address: request.headers.get('x-forwarded-for') || 'unknown',
+          ip_address: clientIp,
         })
         .eq('id', existingDevice.id)
     }
@@ -107,8 +130,8 @@ export async function POST(request: Request) {
     await supabaseAdmin.from('activity_log').insert({
       license_id: lic.id,
       action: 'VERIFY',
-      details: `Game login: ${game} v${ver}`,
-      ip_address: request.headers.get('x-forwarded-for') || 'unknown',
+      details: `Game login: ${game} v${ver} | IP: ${clientIp}`,
+      ip_address: clientIp,
     })
 
     return NextResponse.json({
