@@ -27,11 +27,11 @@ export async function GET(request: Request) {
       )
     }
 
-    // ✅ نضيف used_count مباشرة بدون استعلامات إضافية
+    // ✅ نرجع used_count مباشرة (بدون استعلامات إضافية)
     const licenses = (data || []).map((l) => ({
       ...l,
       used_count: l.used_count ?? 0,
-      device_count: l.used_count ?? 0, // للتوافق مع الواجهة القديمة
+      device_count: l.used_count ?? 0, // للتوافق مع أي كود قديم
     }))
 
     return NextResponse.json({
