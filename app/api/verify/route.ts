@@ -51,6 +51,9 @@ export async function POST(request: Request) {
       )
     }
 
+    // ✅ نستخدم used_count مباشرة بدل عدّ الصفوف (أسرع بآلاف المرات)
+    let activeDevices = lic.used_count || 0
+
     // التحقق من الجهاز
     const { data: existingDevice } = await supabaseAdmin
       .from('devices')
@@ -59,34 +62,37 @@ export async function POST(request: Request) {
       .eq('hwid', hwid)
       .maybeSingle()
 
-    let activeDevices = 0
-
     if (!existingDevice) {
-      const { count } = await supabaseAdmin
-        .from('devices')
-        .select('*', { count: 'exact', head: true })
-        .eq('license_id', lic.id)
+      // ✅ الحد الأقصى = max_devices
+      const userLimit = lic.max_devices ?? 1
 
-      activeDevices = count || 0
-
-      if (activeDevices >= lic.max_devices) {
+      if (activeDevices >= userLimit) {
         return NextResponse.json(
           {
             status: 'error',
-            message: `تجاوزت عدد الأجهزة المسموح (${lic.max_devices})`,
+            message: `تجاوزت عدد الأجهزة المسموح (${userLimit})`,
           },
           { status: 403 }
         )
       }
 
+      // سجل الجهاز الجديد
       await supabaseAdmin.from('devices').insert({
         license_id: lic.id,
         hwid: hwid,
         ip_address: request.headers.get('x-forwarded-for') || 'unknown',
       })
 
-      activeDevices += 1
+      // ✅ زيد العداد
+      const newCount = activeDevices + 1
+      await supabaseAdmin
+        .from('licenses')
+        .update({ used_count: newCount })
+        .eq('id', lic.id)
+
+      activeDevices = newCount
     } else {
+      // جهاز موجود → حدّث آخر ظهور فقط
       await supabaseAdmin
         .from('devices')
         .update({
@@ -94,13 +100,6 @@ export async function POST(request: Request) {
           ip_address: request.headers.get('x-forwarded-for') || 'unknown',
         })
         .eq('id', existingDevice.id)
-
-      const { count } = await supabaseAdmin
-        .from('devices')
-        .select('*', { count: 'exact', head: true })
-        .eq('license_id', lic.id)
-
-      activeDevices = count || 0
     }
 
     const authToken = crypto.randomBytes(16).toString('hex')
