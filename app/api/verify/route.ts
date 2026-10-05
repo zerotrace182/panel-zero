@@ -7,12 +7,12 @@ export async function POST(request: Request) {
     const body = await request.json()
     const key = body.license_key || body.key || ''
     const hwid = body.hwid || ''
-    const game = body.game_type || body.game || '8ball'
+    const game = body.game_type || '8ball'
     const ver = body.version || '1.0'
 
     if (!key || !hwid) {
       return NextResponse.json(
-        { status: 'error', success: false, message: 'بيانات ناقصة' },
+        { status: 'error', message: 'بيانات ناقصة' },
         { status: 400 }
       )
     }
@@ -25,41 +25,41 @@ export async function POST(request: Request) {
 
     if (error || !lic) {
       return NextResponse.json(
-        { status: 'error', success: false, message: 'كود غير صالح' },
+        { status: 'error', message: 'كود غير صالح' },
         { status: 404 }
       )
     }
 
     if (lic.is_banned) {
       return NextResponse.json(
-        { status: 'error', success: false, message: 'تم حظر هذا الكود' },
+        { status: 'error', message: 'تم حظر هذا الكود' },
         { status: 403 }
       )
     }
 
     if (!lic.is_active) {
       return NextResponse.json(
-        { status: 'error', success: false, message: 'الكود معطل' },
+        { status: 'error', message: 'الكود معطل' },
         { status: 403 }
       )
     }
 
     if (new Date(lic.expires_at) <= new Date()) {
       return NextResponse.json(
-        { status: 'error', success: false, message: 'انتهت صلاحية الكود' },
+        { status: 'error', message: 'انتهت صلاحية الكود' },
         { status: 403 }
       )
     }
 
-    // ✅ جلب IP الحقيقي
+    // ✅ جلب IP الحقيقي (يدعم Cloudflare + بروكسيات)
     const forwarded = request.headers.get('x-forwarded-for')
     const clientIp =
-      request.headers.get('cf-connecting-ip') ||
+      request.headers.get('cf-connecting-ip') ||         // Cloudflare
       request.headers.get('x-real-ip') ||
       (forwarded ? forwarded.split(',')[0].trim() : null) ||
       'unknown'
 
-    // ✅ كشف hwid الوهمي
+    // ✅ لو hwid = اسم حزمة التطبيق (غير فريد)، نستخدم IP بدل منه
     const isGenericHwid =
       !hwid ||
       hwid === 'default' ||
@@ -70,7 +70,7 @@ export async function POST(request: Request) {
 
     const deviceKey = isGenericHwid ? `ip-${clientIp}` : hwid
 
-    // ✅ نحسب العداد من devices مباشرة
+    // ✅ نحسب العداد من جدول devices مباشرة (مضمون أكثر من used_count)
     const { count: currentCount } = await supabaseAdmin
       .from('devices')
       .select('*', { count: 'exact', head: true })
@@ -78,6 +78,7 @@ export async function POST(request: Request) {
 
     let activeDevices = currentCount || 0
 
+    // التحقق من الجهاز
     const { data: existingDevice } = await supabaseAdmin
       .from('devices')
       .select('*')
@@ -86,19 +87,20 @@ export async function POST(request: Request) {
       .maybeSingle()
 
     if (!existingDevice) {
+      // ✅ الحد الأقصى
       const userLimit = lic.max_devices ?? 1
 
       if (activeDevices >= userLimit) {
         return NextResponse.json(
           {
             status: 'error',
-            success: false,
             message: `تجاوزت عدد الأجهزة المسموح (${userLimit})`,
           },
           { status: 403 }
         )
       }
 
+      // سجل الجهاز الجديد
       await supabaseAdmin.from('devices').insert({
         license_id: lic.id,
         hwid: deviceKey,
@@ -107,11 +109,13 @@ export async function POST(request: Request) {
 
       activeDevices += 1
 
+      // ✅ نحدث العداد أيضاً (احتياط، لو التريجر ما اشتغل)
       await supabaseAdmin
         .from('licenses')
         .update({ used_count: activeDevices })
         .eq('id', lic.id)
     } else {
+      // جهاز موجود → حدّث آخر ظهور فقط
       await supabaseAdmin
         .from('devices')
         .update({
@@ -130,10 +134,8 @@ export async function POST(request: Request) {
       ip_address: clientIp,
     })
 
-    // ✅ الرد يقبل الشكلين (status و success)
     return NextResponse.json({
       status: 'success',
-      success: true,
       data: {
         license_key: key,
         expiry_date: lic.expires_at,
@@ -145,7 +147,7 @@ export async function POST(request: Request) {
     })
   } catch (err: any) {
     return NextResponse.json(
-      { status: 'error', success: false, message: 'Server error: ' + err.message },
+      { status: 'error', message: 'Server error: ' + err.message },
       { status: 500 }
     )
   }
@@ -154,7 +156,6 @@ export async function POST(request: Request) {
 export async function GET() {
   return NextResponse.json({
     status: 'error',
-    success: false,
     message: 'يجب استخدام POST',
   })
 }
