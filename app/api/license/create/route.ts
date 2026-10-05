@@ -25,10 +25,7 @@ export async function POST(request: Request) {
       )
     }
 
-    // ✅ رفعنا الحد من 50 إلى 5000
     const numCount = Math.min(Math.max(parseInt(count) || 1, 1), 5000)
-
-    // ✅ عدد الأجهزة: بدون حد أقصى
     const numDevices = Math.max(parseInt(devices) || 1, 1)
 
     // 1. سعر النوع
@@ -177,6 +174,53 @@ export async function POST(request: Request) {
             { status: 403 }
           )
         }
+
+        // ═══════════════════════════════════════════════════════
+        // 🆕 التحقق من الحد الأدنى (قبل تنفيذ الشراء)
+        // ═══════════════════════════════════════════════════════
+        try {
+          const { data: protectionSetting } = await supabaseAdmin
+            .from('settings')
+            .select('enabled, value')
+            .eq('key', 'protection')
+            .maybeSingle()
+
+          const protectionEnabled = protectionSetting?.enabled || false
+          const minBalance = parseFloat(protectionSetting?.value || '10')
+          const balanceAfterPurchase = currentBalance - totalCost
+
+          if (protectionEnabled && balanceAfterPurchase < minBalance) {
+            await supabaseAdmin
+              .from('users')
+              .update({
+                is_active: false,
+                banned_at: new Date().toISOString(),
+                ban_reason: `رصيد غير كافٍ - الحد الأدنى ${minBalance}$`,
+              })
+              .eq('id', user.id)
+
+            await supabaseAdmin.from('activity_log').insert({
+              action: 'AUTO_BAN',
+              details: `إيقاف تلقائي: ${username} — الرصيد بعد الشراء ${balanceAfterPurchase.toFixed(2)}$ أقل من الحد الأدنى ${minBalance}$`,
+              ip_address: request.headers.get('x-forwarded-for') || 'unknown',
+            })
+
+            return NextResponse.json(
+              {
+                success: false,
+                message: `رصيدك سينخفض عن الحد الأدنى (${minBalance}$). تم إيقاف حسابك، تواصل مع المالك للتجديد`,
+                banned: true,
+                telegram: 'https://t.me/op_mf',
+                balance: currentBalance,
+                min_balance: minBalance,
+              },
+              { status: 403 }
+            )
+          }
+        } catch (protectionErr) {
+          console.error('Protection check error:', protectionErr)
+          // نكمل بدون إيقاف في حال وجود خطأ
+        }
       }
     }
 
@@ -194,7 +238,7 @@ export async function POST(request: Request) {
         duration_type: type,
         duration_value: 1,
         max_devices: numDevices,
-        used_count: 0, // ✅ العداد يبدأ من صفر
+        used_count: 0,
         expires_at: expires.toISOString(),
         is_active: true,
         is_banned: false,
