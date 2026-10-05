@@ -7,6 +7,92 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url)
     const devicesParam = searchParams.get('devices')
 
+    // 🆕 البحث عن عدد محدد (للبوت)
+    if (devicesParam) {
+      const devices = parseInt(devicesParam)
+      
+      if (!devices || devices < 1 || devices > 5000) {
+        return NextResponse.json(
+          { status: 'error', message: 'عدد أجهزة غير صالح (1-5000)' },
+          { status: 400 }
+        )
+      }
+
+      const { data: exact } = await supabaseAdmin
+        .from('device_prices')
+        .select('device_count, price')
+        .eq('device_count', devices)
+        .maybeSingle()
+
+      if (exact) {
+        return NextResponse.json({
+          status: 'success',
+          price: parseFloat(exact.price),
+          devices: devices,
+          matched: 'exact',
+        })
+      }
+
+      // الأقرب أقل منه
+      const { data: closest } = await supabaseAdmin
+        .from('device_prices')
+        .select('device_count, price')
+        .lte('device_count', devices)
+        .order('device_count', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+
+      if (closest) {
+        return NextResponse.json({
+          status: 'success',
+          price: parseFloat(closest.price),
+          devices: devices,
+          matched: closest.device_count,
+        })
+      }
+
+      // الأقل في الجدول
+      const { data: lowest } = await supabaseAdmin
+        .from('device_prices')
+        .select('device_count, price')
+        .order('device_count', { ascending: true })
+        .limit(1)
+        .maybeSingle()
+
+      return NextResponse.json({
+        status: 'success',
+        price: parseFloat(lowest?.price || 0),
+        devices: devices,
+        matched: 'lowest',
+      })
+    }
+
+    // عرض كل الأسعار
+    const { data, error } = await supabaseAdmin
+      .from('device_prices')
+      .select('*')
+      .order('device_count', { ascending: true })
+
+    if (error) {
+      return NextResponse.json(
+        { status: 'error', message: error.message },
+        { status: 500 }
+      )
+    }
+
+    return NextResponse.json({
+      status: 'success',
+      count: data?.length || 0,
+      prices: data || [],
+    })
+  } catch (err: any) {
+    return NextResponse.json(
+      { status: 'error', message: err.message },
+      { status: 500 }
+    )
+  }
+}
+
     // 🆕 إذا كان البحث عن عدد محدد (للبوت)
     if (devicesParam) {
       const devices = parseInt(devicesParam)
