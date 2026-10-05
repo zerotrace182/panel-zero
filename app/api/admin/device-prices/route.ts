@@ -1,9 +1,74 @@
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 
-// GET — عرض كل الأسعار
-export async function GET() {
+// GET — عرض كل الأسعار أو البحث بعدد محدد
+export async function GET(request: Request) {
   try {
+    const { searchParams } = new URL(request.url)
+    const devicesParam = searchParams.get('devices')
+
+    // 🆕 إذا كان البحث عن عدد محدد (للبوت)
+    if (devicesParam) {
+      const devices = parseInt(devicesParam)
+      
+      if (!devices || devices < 1) {
+        return NextResponse.json(
+          { status: 'error', message: 'عدد أجهزة غير صالح' },
+          { status: 400 }
+        )
+      }
+
+      // البحث عن سعر مطابق
+      const { data: exact } = await supabaseAdmin
+        .from('device_prices')
+        .select('device_count, price')
+        .eq('device_count', devices)
+        .maybeSingle()
+
+      if (exact) {
+        return NextResponse.json({
+          status: 'success',
+          devices: devices,
+          price: parseFloat(exact.price),
+          matched: 'exact',
+        })
+      }
+
+      // الأقرب أقل منه
+      const { data: closest } = await supabaseAdmin
+        .from('device_prices')
+        .select('device_count, price')
+        .lte('device_count', devices)
+        .order('device_count', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+
+      if (closest) {
+        return NextResponse.json({
+          status: 'success',
+          devices: devices,
+          price: parseFloat(closest.price),
+          matched: closest.device_count,
+        })
+      }
+
+      // الأقل في الجدول
+      const { data: lowest } = await supabaseAdmin
+        .from('device_prices')
+        .select('device_count, price')
+        .order('device_count', { ascending: true })
+        .limit(1)
+        .maybeSingle()
+
+      return NextResponse.json({
+        status: 'success',
+        devices: devices,
+        price: parseFloat(lowest?.price || 0),
+        matched: 'lowest',
+      })
+    }
+
+    // الطريقة القديمة: عرض كل الأسعار
     const { data, error } = await supabaseAdmin
       .from('device_prices')
       .select('*')
@@ -16,6 +81,18 @@ export async function GET() {
       )
     }
 
+    return NextResponse.json({
+      status: 'success',
+      count: data?.length || 0,
+      prices: data || [],
+    })
+  } catch (err: any) {
+    return NextResponse.json(
+      { status: 'error', message: err.message },
+      { status: 500 }
+    )
+  }
+}
     return NextResponse.json({
       status: 'success',
       count: data?.length || 0,
