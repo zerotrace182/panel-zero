@@ -76,6 +76,7 @@ export async function POST(request: Request) {
     // 4. جلب المستخدم
     let user: any = null
     let isDistributor = false
+    let isOwner = false
 
     if (username) {
       const { data } = await supabaseAdmin
@@ -86,140 +87,143 @@ export async function POST(request: Request) {
 
       user = data
 
-      if (user && (user.role === 'distributor' || user.role === 'owner')) {
-        isDistributor = true
+      if (user) {
+        // 🆕 المالك فقط لا يُخصم منه
+        isOwner = (user.role === 'owner')
+        
+        // الموزع والمدير يُخصم منهم عادي
+        if (!isOwner) {
+          isDistributor = true
 
-        if (!user.is_active) {
-          return NextResponse.json(
-            {
-              success: false,
-              message: 'حسابك معطل',
-              banned: true,
-              telegram: 'https://t.me/op_mf',
-            },
-            { status: 403 }
-          )
-        }
+          if (!user.is_active) {
+            return NextResponse.json(
+              {
+                success: false,
+                message: 'حسابك معطل',
+                banned: true,
+                telegram: 'https://t.me/op_mf',
+              },
+              { status: 403 }
+            )
+          }
 
-        const currentBalance = parseFloat(user.balance || 0)
+          const currentBalance = parseFloat(user.balance || 0)
 
-        if (currentBalance <= 0) {
-          await supabaseAdmin
-            .from('users')
-            .update({
-              is_active: false,
-              banned_at: new Date().toISOString(),
-              ban_reason: 'الرصيد = صفر',
-            })
-            .eq('id', user.id)
-
-          await supabaseAdmin.from('activity_log').insert({
-            action: 'AUTO_BAN',
-            details: `تعطيل تلقائي: ${username} — الرصيد صفر`,
-            ip_address: request.headers.get('x-forwarded-for') || 'unknown',
-          })
-
-          await supabaseAdmin.from('transactions').insert({
-            user_id: user.id,
-            amount: 0,
-            type: 'auto_ban',
-            description: 'تعطيل الحساب: الرصيد صفر',
-          })
-
-          return NextResponse.json(
-            {
-              success: false,
-              message: 'انتهى رصيدك، تم تعطيل حسابك',
-              banned: true,
-              telegram: 'https://t.me/op_mf',
-              balance: currentBalance,
-              required: totalCost,
-            },
-            { status: 403 }
-          )
-        }
-
-        if (currentBalance < totalCost) {
-          await supabaseAdmin
-            .from('users')
-            .update({
-              is_active: false,
-              banned_at: new Date().toISOString(),
-              ban_reason: `رصيد غير كافٍ (${currentBalance.toFixed(2)}$ من ${totalCost.toFixed(2)}$)`,
-            })
-            .eq('id', user.id)
-
-          await supabaseAdmin.from('activity_log').insert({
-            action: 'AUTO_BAN',
-            details: `تعطيل تلقائي: ${username} — الرصيد ${currentBalance.toFixed(2)}$ أقل من السعر ${totalCost.toFixed(2)}$`,
-            ip_address: request.headers.get('x-forwarded-for') || 'unknown',
-          })
-
-          await supabaseAdmin.from('transactions').insert({
-            user_id: user.id,
-            amount: 0,
-            type: 'auto_ban',
-            description: `تعطيل الحساب: الرصيد ${currentBalance.toFixed(2)}$ غير كافٍ`,
-          })
-
-          return NextResponse.json(
-            {
-              success: false,
-              message: `انتهى رصيدك (${currentBalance.toFixed(2)}$)، السعر المطلوب ${totalCost.toFixed(2)}$. تم تعطيل حسابك`,
-              banned: true,
-              telegram: 'https://t.me/op_mf',
-              balance: currentBalance,
-              required: totalCost,
-            },
-            { status: 403 }
-          )
-        }
-
-        // ═══════════════════════════════════════════════════════
-        // 🆕 التحقق من الحد الأدنى (قبل تنفيذ الشراء)
-        // ═══════════════════════════════════════════════════════
-        try {
-          const { data: protectionSetting } = await supabaseAdmin
-            .from('settings')
-            .select('enabled, value')
-            .eq('key', 'protection')
-            .maybeSingle()
-
-          const protectionEnabled = protectionSetting?.enabled || false
-          const minBalance = parseFloat(protectionSetting?.value || '10')
-          const balanceAfterPurchase = currentBalance - totalCost
-
-          if (protectionEnabled && balanceAfterPurchase < minBalance) {
+          if (currentBalance <= 0) {
             await supabaseAdmin
               .from('users')
               .update({
                 is_active: false,
                 banned_at: new Date().toISOString(),
-                ban_reason: `رصيد غير كافٍ - الحد الأدنى ${minBalance}$`,
+                ban_reason: 'الرصيد = صفر',
               })
               .eq('id', user.id)
 
             await supabaseAdmin.from('activity_log').insert({
               action: 'AUTO_BAN',
-              details: `إيقاف تلقائي: ${username} — الرصيد بعد الشراء ${balanceAfterPurchase.toFixed(2)}$ أقل من الحد الأدنى ${minBalance}$`,
+              details: `تعطيل تلقائي: ${username} — الرصيد صفر`,
               ip_address: request.headers.get('x-forwarded-for') || 'unknown',
+            })
+
+            await supabaseAdmin.from('transactions').insert({
+              user_id: user.id,
+              amount: 0,
+              type: 'auto_ban',
+              description: 'تعطيل الحساب: الرصيد صفر',
             })
 
             return NextResponse.json(
               {
                 success: false,
-                message: `رصيدك سينخفض عن الحد الأدنى (${minBalance}$). تم إيقاف حسابك، تواصل مع المالك للتجديد`,
+                message: 'انتهى رصيدك، تم تعطيل حسابك',
                 banned: true,
                 telegram: 'https://t.me/op_mf',
                 balance: currentBalance,
-                min_balance: minBalance,
+                required: totalCost,
               },
               { status: 403 }
             )
           }
-        } catch (protectionErr) {
-          console.error('Protection check error:', protectionErr)
-          // نكمل بدون إيقاف في حال وجود خطأ
+
+          if (currentBalance < totalCost) {
+            await supabaseAdmin
+              .from('users')
+              .update({
+                is_active: false,
+                banned_at: new Date().toISOString(),
+                ban_reason: `رصيد غير كافٍ (${currentBalance.toFixed(2)}$ من ${totalCost.toFixed(2)}$)`,
+              })
+              .eq('id', user.id)
+
+            await supabaseAdmin.from('activity_log').insert({
+              action: 'AUTO_BAN',
+              details: `تعطيل تلقائي: ${username} — الرصيد ${currentBalance.toFixed(2)}$ أقل من السعر ${totalCost.toFixed(2)}$`,
+              ip_address: request.headers.get('x-forwarded-for') || 'unknown',
+            })
+
+            await supabaseAdmin.from('transactions').insert({
+              user_id: user.id,
+              amount: 0,
+              type: 'auto_ban',
+              description: `تعطيل الحساب: الرصيد ${currentBalance.toFixed(2)}$ غير كافٍ`,
+            })
+
+            return NextResponse.json(
+              {
+                success: false,
+                message: `انتهى رصيدك (${currentBalance.toFixed(2)}$)، السعر المطلوب ${totalCost.toFixed(2)}$. تم تعطيل حسابك`,
+                banned: true,
+                telegram: 'https://t.me/op_mf',
+                balance: currentBalance,
+                required: totalCost,
+              },
+              { status: 403 }
+            )
+          }
+
+          // التحقق من الحد الأدنى
+          try {
+            const { data: protectionSetting } = await supabaseAdmin
+              .from('settings')
+              .select('enabled, value')
+              .eq('key', 'protection')
+              .maybeSingle()
+
+            const protectionEnabled = protectionSetting?.enabled || false
+            const minBalance = parseFloat(protectionSetting?.value || '10')
+            const balanceAfterPurchase = currentBalance - totalCost
+
+            if (protectionEnabled && balanceAfterPurchase < minBalance) {
+              await supabaseAdmin
+                .from('users')
+                .update({
+                  is_active: false,
+                  banned_at: new Date().toISOString(),
+                  ban_reason: `رصيد غير كافٍ - الحد الأدنى ${minBalance}$`,
+                })
+                .eq('id', user.id)
+
+              await supabaseAdmin.from('activity_log').insert({
+                action: 'AUTO_BAN',
+                details: `إيقاف تلقائي: ${username} — الرصيد بعد الشراء ${balanceAfterPurchase.toFixed(2)}$ أقل من الحد الأدنى ${minBalance}$`,
+                ip_address: request.headers.get('x-forwarded-for') || 'unknown',
+              })
+
+              return NextResponse.json(
+                {
+                  success: false,
+                  message: `رصيدك سينخفض عن الحد الأدنى (${minBalance}$). تم إيقاف حسابك، تواصل مع المالك للتجديد`,
+                  banned: true,
+                  telegram: 'https://t.me/op_mf',
+                  balance: currentBalance,
+                  min_balance: minBalance,
+                },
+                { status: 403 }
+              )
+            }
+          } catch (protectionErr) {
+            console.error('Protection check error:', protectionErr)
+          }
         }
       }
     }
@@ -255,12 +259,12 @@ export async function POST(request: Request) {
 
       await supabaseAdmin.from('activity_log').insert({
         action: 'CREATE',
-        details: `إنشاء مفتاح (${type}) - ${numDevices} جهاز - $${pricePerKey}`,
+        details: `إنشاء مفتاح (${type}) - ${numDevices} جهاز - $${pricePerKey} - بواسطة: ${username || 'غير معروف'}`,
         ip_address: request.headers.get('x-forwarded-for') || 'unknown',
       })
     }
 
-    // 6. خصم الرصيد
+    // 6. خصم الرصيد (فقط إذا ليس owner)
     if (isDistributor && user && keys.length > 0) {
       const actualCost = pricePerKey * keys.length
       const newBalance = parseFloat(user.balance || 0) - actualCost
@@ -287,6 +291,7 @@ export async function POST(request: Request) {
       price_per_key: pricePerKey,
       type_price: typePrice,
       device_price: devicePrice,
+      free_for_owner: isOwner,  // 🆕 إشارة للبوت
     })
   } catch (error: any) {
     return NextResponse.json(
