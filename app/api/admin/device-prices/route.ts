@@ -1,13 +1,11 @@
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 
-// GET — عرض كل الأسعار أو البحث بعدد محدد
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
     const devicesParam = searchParams.get('devices')
 
-    // إذا كان البحث عن عدد محدد (للبوت)
     if (devicesParam) {
       const devices = parseInt(devicesParam)
 
@@ -18,7 +16,6 @@ export async function GET(request: Request) {
         )
       }
 
-      // البحث عن سعر مطابق
       const { data: exact } = await supabaseAdmin
         .from('device_prices')
         .select('device_count, price')
@@ -34,7 +31,6 @@ export async function GET(request: Request) {
         })
       }
 
-      // الأقرب أقل منه
       const { data: closest } = await supabaseAdmin
         .from('device_prices')
         .select('device_count, price')
@@ -52,7 +48,6 @@ export async function GET(request: Request) {
         })
       }
 
-      // الأقل في الجدول
       const { data: lowest } = await supabaseAdmin
         .from('device_prices')
         .select('device_count, price')
@@ -68,7 +63,6 @@ export async function GET(request: Request) {
       })
     }
 
-    // عرض كل الأسعار
     const { data, error } = await supabaseAdmin
       .from('device_prices')
       .select('*')
@@ -94,7 +88,6 @@ export async function GET(request: Request) {
   }
 }
 
-// POST — إضافة أو تحديث سعر
 export async function POST(request: Request) {
   try {
     const { device_count, price } = await request.json()
@@ -159,7 +152,6 @@ export async function POST(request: Request) {
   }
 }
 
-// DELETE — حذف سعر
 export async function DELETE(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
