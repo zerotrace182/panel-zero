@@ -206,7 +206,7 @@ export async function PATCH(request: Request) {
   }
 }
 
-// DELETE — حذف ناعم للمستخدم (تعطيل + سبب "تم الحذف من قبل المطور")
+// DELETE — حذف دائم للمستخدم
 export async function DELETE(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
@@ -218,6 +218,60 @@ export async function DELETE(request: Request) {
         { status: 400 }
       )
     }
+
+    const { data: user } = await supabaseAdmin
+      .from('users')
+      .select('id, username, role')
+      .eq('id', id)
+      .maybeSingle()
+
+    if (!user) {
+      return NextResponse.json(
+        { success: false, message: 'المستخدم غير موجود' },
+        { status: 404 }
+      )
+    }
+
+    if (user.role === 'admin' || user.role === 'owner') {
+      return NextResponse.json(
+        { success: false, message: 'لا يمكن حذف حساب المدير أو المالك' },
+        { status: 400 }
+      )
+    }
+
+    // حذف المعاملات المرتبطة
+    await supabaseAdmin.from('transactions').delete().eq('user_id', id)
+    
+    // حذف الأكواد المرتبطة
+    await supabaseAdmin.from('licenses').delete().eq('created_by_user', id)
+
+    // حذف المستخدم نفسه
+    const { error } = await supabaseAdmin.from('users').delete().eq('id', id)
+
+    if (error) {
+      return NextResponse.json(
+        { success: false, message: error.message },
+        { status: 500 }
+      )
+    }
+
+    await supabaseAdmin.from('activity_log').insert({
+      action: 'DELETE_USER',
+      details: `حذف نهائي: ${user.username}`,
+      ip_address: 'web',
+    })
+
+    return NextResponse.json({
+      success: true,
+      message: 'تم الحذف النهائي',
+    })
+  } catch (err: any) {
+    return NextResponse.json(
+      { success: false, message: err.message },
+      { status: 500 }
+    )
+  }
+}
 
     // جلب المستخدم
     const { data: user } = await supabaseAdmin
