@@ -169,6 +169,7 @@ export default function AdminDashboardPage() {
           marginBottom: '30px',
           justifyContent: 'center'
         }}>
+          {/* 👇 هنا تم إضافة الزرين الجديدين 👇 */}
           <a href="/dashboard/create" style={{
             display: 'inline-block',
             padding: '14px 26px',
@@ -177,8 +178,22 @@ export default function AdminDashboardPage() {
             textDecoration: 'none',
             borderRadius: '10px',
             fontWeight: 700,
-            fontSize: '14px'
-          }}>✦ إنشاء مفتاح ✦</a>
+            fontSize: '14px',
+            boxShadow: '0 4px 15px rgba(212,175,55,0.4)'
+          }}>🔑 إنشاء مفتاح (كود)</a>
+
+          <a href="/dashboard/create" style={{
+            display: 'inline-block',
+            padding: '14px 26px',
+            background: 'linear-gradient(135deg, #4CAF50, #66bb6a)',
+            color: '#fff',
+            textDecoration: 'none',
+            borderRadius: '10px',
+            fontWeight: 700,
+            fontSize: '14px',
+            boxShadow: '0 4px 15px rgba(76,175,80,0.4)'
+          }}>👤 إنشاء حساب (يوزر/باس)</a>
+          {/* 👆 نهاية التعديل 👆 */}
 
           <a href="/dashboard/invites" style={{
             display: 'inline-block',
