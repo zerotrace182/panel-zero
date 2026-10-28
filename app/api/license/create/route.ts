@@ -15,7 +15,9 @@ function generateKey(): string {
 export async function POST(request: Request) {
   try {
     const body = await request.json()
-    const { type, count, devices, username } = body
+    // --- إضافة جديدة: استقبال genType و accounts من الواجهة ---
+    const { type, count, devices, username, genType, accounts } = body
+    // -----------------------------------------------------
 
     const days = PRESETS[type]
     if (!days) {
@@ -88,10 +90,8 @@ export async function POST(request: Request) {
       user = data
 
       if (user) {
-        // 🆕 المالك فقط لا يُخصم منه
         isOwner = (user.role === 'owner')
         
-        // الموزع والمدير يُخصم منهم عادي
         if (!isOwner) {
           isDistributor = true
 
@@ -228,41 +228,79 @@ export async function POST(request: Request) {
       }
     }
 
-    // 5. توليد المفاتيح
+    // 5. توليد المفاتيح أو الحسابات
     const expires = new Date()
     expires.setDate(expires.getDate() + days)
 
     const keys: string[] = []
 
-    for (let i = 0; i < numCount; i++) {
-      const key = generateKey()
+    // --- التعديل الجديد: التحقق من نوع التوليد ---
+    if (genType === 'account' && accounts && accounts.length > 0) {
+      // إذا كان الطلب لتوليد حسابات (يوزر وباس)
+      for (let i = 0; i < accounts.length; i++) {
+        const acc = accounts[i]
+        // دمج اليوزر والباس في حقل license_key ليتمكن التطبيق من قراءتهما معاً
+        const combinedKey = `${acc.username}:${acc.password}` 
 
-      const { error } = await supabaseAdmin.from('licenses').insert({
-        license_key: key,
-        duration_type: type,
-        duration_value: 1,
-        max_devices: numDevices,
-        used_count: 0,
-        expires_at: expires.toISOString(),
-        is_active: true,
-        is_banned: false,
-        created_by_user: user?.id || null,
-        cost: pricePerKey,
-      })
+        const { error } = await supabaseAdmin.from('licenses').insert({
+          license_key: combinedKey, // هنا نحفظ (يوزر:باس)
+          duration_type: type,
+          duration_value: 1,
+          max_devices: numDevices,
+          used_count: 0,
+          expires_at: expires.toISOString(),
+          is_active: true,
+          is_banned: false,
+          created_by_user: user?.id || null,
+          cost: pricePerKey,
+        })
 
-      if (error) {
-        console.error('Insert error:', error)
-        continue
+        if (error) {
+          console.error('Insert error:', error)
+          continue
+        }
+
+        keys.push(combinedKey)
+
+        await supabaseAdmin.from('activity_log').insert({
+          action: 'CREATE_ACCOUNT',
+          details: `إنشاء حساب (${type}) - ${numDevices} جهاز - $${pricePerKey} - بواسطة: ${username || 'غير معروف'}`,
+          ip_address: request.headers.get('x-forwarded-for') || 'unknown',
+        })
       }
+    } else {
+      // الكود القديم الخاص بتوليد المفاتيح (لم نلمسه)
+      for (let i = 0; i < numCount; i++) {
+        const key = generateKey()
 
-      keys.push(key)
+        const { error } = await supabaseAdmin.from('licenses').insert({
+          license_key: key,
+          duration_type: type,
+          duration_value: 1,
+          max_devices: numDevices,
+          used_count: 0,
+          expires_at: expires.toISOString(),
+          is_active: true,
+          is_banned: false,
+          created_by_user: user?.id || null,
+          cost: pricePerKey,
+        })
 
-      await supabaseAdmin.from('activity_log').insert({
-        action: 'CREATE',
-        details: `إنشاء مفتاح (${type}) - ${numDevices} جهاز - $${pricePerKey} - بواسطة: ${username || 'غير معروف'}`,
-        ip_address: request.headers.get('x-forwarded-for') || 'unknown',
-      })
+        if (error) {
+          console.error('Insert error:', error)
+          continue
+        }
+
+        keys.push(key)
+
+        await supabaseAdmin.from('activity_log').insert({
+          action: 'CREATE',
+          details: `إنشاء مفتاح (${type}) - ${numDevices} جهاز - $${pricePerKey} - بواسطة: ${username || 'غير معروف'}`,
+          ip_address: request.headers.get('x-forwarded-for') || 'unknown',
+        })
+      }
     }
+    // ---------------------------------------------
 
     // 6. خصم الرصيد (فقط إذا ليس owner)
     if (isDistributor && user && keys.length > 0) {
@@ -278,7 +316,7 @@ export async function POST(request: Request) {
         user_id: user.id,
         amount: -actualCost,
         type: 'purchase',
-        description: `شراء ${keys.length} مفتاح (${type}، ${numDevices} جهاز)`,
+        description: `شراء ${keys.length} ${genType === 'account' ? 'حساب' : 'مفتاح'} (${type}، ${numDevices} جهاز)`,
       })
     }
 
@@ -291,7 +329,7 @@ export async function POST(request: Request) {
       price_per_key: pricePerKey,
       type_price: typePrice,
       device_price: devicePrice,
-      free_for_owner: isOwner,  // 🆕 إشارة للبوت
+      free_for_owner: isOwner,
     })
   } catch (error: any) {
     return NextResponse.json(
