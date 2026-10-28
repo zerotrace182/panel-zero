@@ -7,12 +7,41 @@ const PRESETS: Record<string, number> = {
   month3: 90, month6: 180, year1: 365, forever: 36500,
 }
 
+// دالة توليد اليوزر والباس
+function generateUserAndPass() {
+  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+  
+  // يوزر يبدأ بـ zero + 4 أحرف/أرقام
+  let randomUser = "";
+  for (let i = 0; i < 4; i++) {
+    randomUser += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  const username = "zero" + randomUser;
+
+  // باس 8 أحرف/أرقام
+  let password = "";
+  for (let i = 0; i < 8; i++) {
+    password += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+
+  return { username, password };
+}
+
 export default function CreateKeyPage() {
+  // --- إضافة جديدة: حالة لاختيار نوع التوليد ---
+  const [genType, setGenType] = useState<'key' | 'account'>('key');
+  // ---------------------------------------------
+
   const [type, setType] = useState('month1')
   const [count, setCount] = useState(1)
   const [devices, setDevices] = useState(1)
   const [loading, setLoading] = useState(false)
+  
+  // مصفوفة للمفاتيح القديمة
   const [keys, setKeys] = useState<string[]>([])
+  // مصفوفة جديدة للحسابات (يوزر وباس)
+  const [accounts, setAccounts] = useState<{username: string, password: string}[]>([])
+  
   const [error, setError] = useState('')
   const [cost, setCost] = useState(0)
 
@@ -53,13 +82,11 @@ export default function CreateKeyPage() {
     const exact = devicePrices.find(p => p.device_count === devices)
     if (exact) return parseFloat(exact.price)
 
-    // أقرب أقل
     const lower = devicePrices
       .filter(p => p.device_count <= devices)
       .sort((a, b) => b.device_count - a.device_count)[0]
     if (lower) return parseFloat(lower.price)
 
-    // الأدنى
     const lowest = devicePrices.sort((a, b) => a.device_count - b.device_count)[0]
     return lowest ? parseFloat(lowest.price) : 1
   }
@@ -73,15 +100,25 @@ export default function CreateKeyPage() {
     setError('')
     setLoading(true)
     setKeys([])
+    setAccounts([])
     setCost(0)
 
     try {
-      const username = localStorage.getItem('panel_user') || ''
+      const adminUser = localStorage.getItem('panel_user') || ''
+      
+      let payload: any = { type, count, devices, username: adminUser, genType };
+
+      // إذا اختار "حساب" نقوم بتوليد اليوزر والباس ونرسلهم
+      if (genType === 'account') {
+        const generatedAccounts = Array.from({ length: count }, () => generateUserAndPass());
+        payload.accounts = generatedAccounts;
+      }
+      // إذا اختار "مفتاح" نرسل الطلب كما هو (الـ API القديم سيتكفل بتوليد الكود)
 
       const res = await fetch('/api/license/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type, count, devices, username }),
+        body: JSON.stringify(payload),
       })
 
       const data = await res.json()
@@ -93,7 +130,15 @@ export default function CreateKeyPage() {
       }
 
       if (data.success) {
-        setKeys(data.keys || [])
+        // إذا كان النوع حساب، نعرض الحسابات
+        if (genType === 'account' && payload.accounts) {
+          setAccounts(payload.accounts)
+        } 
+        // إذا كان النوع مفتاح، نعرض المفاتيح القادمة من السيرفر
+        else {
+          setKeys(data.keys || [])
+        }
+
         setCost(data.cost || 0)
 
         if (data.cost > 0) {
@@ -112,115 +157,86 @@ export default function CreateKeyPage() {
   }
 
   function copyAll() {
-    navigator.clipboard.writeText(keys.join('\n'))
-    alert('تم نسخ كل المفاتيح ✅')
+    if (genType === 'account' && accounts.length > 0) {
+      const textToCopy = accounts.map((acc, i) => 
+        `${i + 1}. User: ${acc.username} | Pass: ${acc.password}`
+      ).join('\n')
+      navigator.clipboard.writeText(textToCopy)
+      alert('تم نسخ كل الحسابات ✅')
+    } else if (keys.length > 0) {
+      navigator.clipboard.writeText(keys.join('\n'))
+      alert('تم نسخ كل المفاتيح ✅')
+    }
   }
 
   const inputStyle: any = {
-    width: '100%',
-    padding: '14px',
-    background: '#0a0a0a',
-    border: '1px solid rgba(212,175,55,0.3)',
-    borderRadius: '10px',
-    color: '#e8e8e8',
-    fontSize: '15px',
-    marginBottom: '20px',
-    boxSizing: 'border-box',
-    outline: 'none'
+    width: '100%', padding: '14px', background: '#0a0a0a', border: '1px solid rgba(212,175,55,0.3)', borderRadius: '10px', color: '#e8e8e8', fontSize: '15px', marginBottom: '20px', boxSizing: 'border-box', outline: 'none'
   }
 
   const labelStyle: any = {
-    display: 'block',
-    color: '#d4af37',
-    fontSize: '12px',
-    marginBottom: '8px',
-    letterSpacing: '2px'
+    display: 'block', color: '#d4af37', fontSize: '12px', marginBottom: '8px', letterSpacing: '2px'
   }
 
   const isAdmin = userRole === 'admin' || userRole === 'owner'
 
   return (
-    <main style={{
-      minHeight: '100vh',
-      background: '#050505',
-      backgroundImage: 'radial-gradient(ellipse at top left, rgba(212,175,55,.08) 0%, transparent 45%), radial-gradient(ellipse at bottom right, rgba(212,175,55,.08) 0%, transparent 45%)',
-      color: '#e8e8e8',
-      padding: '25px 15px'
-    }}>
+    <main style={{ minHeight: '100vh', background: '#050505', backgroundImage: 'radial-gradient(ellipse at top left, rgba(212,175,55,.08) 0%, transparent 45%), radial-gradient(ellipse at bottom right, rgba(212,175,55,.08) 0%, transparent 45%)', color: '#e8e8e8', padding: '25px 15px' }}>
       <div style={{ maxWidth: '600px', margin: '0 auto' }}>
 
-        <a href="/dashboard" style={{
-          color: '#d4af37',
-          textDecoration: 'none',
-          fontSize: '14px',
-          display: 'inline-block',
-          marginBottom: '20px'
-        }}>← العودة للوحة</a>
+        <a href="/dashboard" style={{ color: '#d4af37', textDecoration: 'none', fontSize: '14px', display: 'inline-block', marginBottom: '20px' }}>← العودة للوحة</a>
 
-        <div style={{
-          background: 'linear-gradient(145deg, #0f0f0f, #1a1a1a)',
-          border: '2px solid #d4af37',
-          borderRadius: '20px',
-          padding: '40px 30px',
-          boxShadow: '0 15px 50px rgba(0,0,0,0.8), 0 0 60px rgba(212,175,55,0.15)'
-        }}>
+        <div style={{ background: 'linear-gradient(145deg, #0f0f0f, #1a1a1a)', border: '2px solid #d4af37', borderRadius: '20px', padding: '40px 30px', boxShadow: '0 15px 50px rgba(0,0,0,0.8), 0 0 60px rgba(212,175,55,0.15)' }}>
 
           <div style={{ textAlign: 'center', fontSize: '50px', marginBottom: '10px' }}>🔑</div>
 
-          <h1 style={{
-            fontWeight: 900,
-            textAlign: 'center',
-            fontSize: '24px',
-            letterSpacing: '4px',
-            background: 'linear-gradient(180deg, #f4d03f, #d4af37, #b8941f)',
-            WebkitBackgroundClip: 'text',
-            WebkitTextFillColor: 'transparent',
-            marginBottom: '25px'
-          }}>إنشاء مفاتيح</h1>
+          <h1 style={{ fontWeight: 900, textAlign: 'center', fontSize: '24px', letterSpacing: '4px', background: 'linear-gradient(180deg, #f4d03f, #d4af37, #b8941f)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', marginBottom: '25px' }}>إنشاء</h1>
 
-          <div style={{
-            width: '120px',
-            height: '1px',
-            background: 'linear-gradient(90deg, transparent, #d4af37, transparent)',
-            margin: '0 auto 30px'
-          }} />
+          <div style={{ width: '120px', height: '1px', background: 'linear-gradient(90deg, transparent, #d4af37, transparent)', margin: '0 auto 30px' }} />
+
+          {/* --- الخيار الجديد: تبديل بين مفتاح وحساب --- */}
+          <div style={{ display: 'flex', gap: '10px', marginBottom: '25px' }}>
+            <button
+              type="button"
+              onClick={() => setGenType('key')}
+              style={{
+                flex: 1, padding: '12px', borderRadius: '10px', fontWeight: 700, cursor: 'pointer',
+                background: genType === 'key' ? 'rgba(212,175,55,0.2)' : 'transparent',
+                border: genType === 'key' ? '1px solid #d4af37' : '1px solid rgba(212,175,55,0.2)',
+                color: genType === 'key' ? '#f4d03f' : '#888',
+                transition: '0.3s'
+              }}
+            >
+              🔑 توليد مفتاح (كود)
+            </button>
+            <button
+              type="button"
+              onClick={() => setGenType('account')}
+              style={{
+                flex: 1, padding: '12px', borderRadius: '10px', fontWeight: 700, cursor: 'pointer',
+                background: genType === 'account' ? 'rgba(212,175,55,0.2)' : 'transparent',
+                border: genType === 'account' ? '1px solid #d4af37' : '1px solid rgba(212,175,55,0.2)',
+                color: genType === 'account' ? '#f4d03f' : '#888',
+                transition: '0.3s'
+              }}
+            >
+              👤 توليد يوزر وباس
+            </button>
+          </div>
+          {/* ------------------------------------- */}
 
           {userRole === 'distributor' && (
-            <div style={{
-              background: 'rgba(76,175,80,0.1)',
-              border: '1px solid rgba(76,175,80,0.4)',
-              borderRadius: '10px',
-              padding: '12px',
-              marginBottom: '20px',
-              textAlign: 'center',
-              color: '#66bb6a',
-              fontSize: '14px',
-              fontWeight: 700
-            }}>
+            <div style={{ background: 'rgba(76,175,80,0.1)', border: '1px solid rgba(76,175,80,0.4)', borderRadius: '10px', padding: '12px', marginBottom: '20px', textAlign: 'center', color: '#66bb6a', fontSize: '14px', fontWeight: 700 }}>
               💰 رصيدك: ${balance.toFixed(2)}
             </div>
           )}
 
           {error && (
-            <div style={{
-              background: 'rgba(229,115,115,0.15)',
-              border: '1px solid rgba(229,115,115,0.5)',
-              color: '#ef5350',
-              padding: '12px',
-              borderRadius: '10px',
-              marginBottom: '20px',
-              textAlign: 'center',
-              fontSize: '13px'
-            }}>✦ {error} ✦</div>
+            <div style={{ background: 'rgba(229,115,115,0.15)', border: '1px solid rgba(229,115,115,0.5)', color: '#ef5350', padding: '12px', borderRadius: '10px', marginBottom: '20px', textAlign: 'center', fontSize: '13px' }}>✦ {error} ✦</div>
           )}
 
           <form onSubmit={handleCreate}>
             <label style={labelStyle}>نوع المدة</label>
-            <select
-              value={type}
-              onChange={(e) => setType(e.target.value)}
-              style={inputStyle}
-            >
+            <select value={type} onChange={(e) => setType(e.target.value)} style={inputStyle}>
               <option value="day1">📅 يوم واحد — ${typePrices.find(p => p.duration_type === 'day1')?.price || 0}</option>
               <option value="day3">📅 3 أيام — ${typePrices.find(p => p.duration_type === 'day3')?.price || 0}</option>
               <option value="week1">📆 أسبوع — ${typePrices.find(p => p.duration_type === 'week1')?.price || 0}</option>
@@ -232,178 +248,78 @@ export default function CreateKeyPage() {
               <option value="forever">♾️ دائم — ${typePrices.find(p => p.duration_type === 'forever')?.price || 0}</option>
             </select>
 
-            <label style={labelStyle}>عدد المفاتيح (1-50)</label>
-            <select
-              value={count}
-              onChange={(e) => setCount(parseInt(e.target.value))}
-              style={inputStyle}
-            >
+            <label style={labelStyle}>العدد (1-50)</label>
+            <select value={count} onChange={(e) => setCount(parseInt(e.target.value))} style={inputStyle}>
               {Array.from({ length: 50 }, (_, i) => i + 1).map(n => (
-                <option key={n} value={n}>{n} مفتاح</option>
+                <option key={n} value={n}>{n}</option>
               ))}
             </select>
 
             <label style={labelStyle}>عدد الأجهزة المسموحة</label>
-            <input
-              type="number"
-              value={devices}
-              onChange={(e) => setDevices(Math.max(1, parseInt(e.target.value) || 1))}
-              min={1}
-              style={inputStyle}
-            />
+            <input type="number" value={devices} onChange={(e) => setDevices(Math.max(1, parseInt(e.target.value) || 1))} min={1} style={inputStyle} />
 
-            {/* Pricing Preview */}
-            <div style={{
-              background: 'rgba(212,175,55,0.08)',
-              border: '1px solid rgba(212,175,55,0.4)',
-              borderRadius: '12px',
-              padding: '15px',
-              marginBottom: '20px'
-            }}>
-              <div style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                marginBottom: '8px',
-                fontSize: '13px',
-                color: '#ccc'
-              }}>
+            <div style={{ background: 'rgba(212,175,55,0.08)', border: '1px solid rgba(212,175,55,0.4)', borderRadius: '12px', padding: '15px', marginBottom: '20px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '13px', color: '#ccc' }}>
                 <span>سعر النوع:</span>
-                <span style={{ color: '#f4d03f', fontFamily: 'monospace' }}>
-                  ${getTypePrice().toFixed(2)}
-                </span>
+                <span style={{ color: '#f4d03f', fontFamily: 'monospace' }}>${getTypePrice().toFixed(2)}</span>
               </div>
-              <div style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                marginBottom: '8px',
-                fontSize: '13px',
-                color: '#ccc'
-              }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '13px', color: '#ccc' }}>
                 <span>سعر الأجهزة ({devices}):</span>
-                <span style={{ color: '#f4d03f', fontFamily: 'monospace' }}>
-                  ${getDevicePrice().toFixed(2)}
-                </span>
+                <span style={{ color: '#f4d03f', fontFamily: 'monospace' }}>${getDevicePrice().toFixed(2)}</span>
               </div>
-              <div style={{
-                borderTop: '1px solid rgba(212,175,55,0.3)',
-                paddingTop: '8px',
-                display: 'flex',
-                justifyContent: 'space-between',
-                fontSize: '14px',
-                fontWeight: 700,
-                color: '#d4af37'
-              }}>
-                <span>لللكود الواحد:</span>
-                <span style={{ fontFamily: 'monospace' }}>
-                  ${pricePerKey.toFixed(2)}
-                </span>
+              <div style={{ borderTop: '1px solid rgba(212,175,55,0.3)', paddingTop: '8px', display: 'flex', justifyContent: 'space-between', fontSize: '14px', fontWeight: 700, color: '#d4af37' }}>
+                <span>للحساب/المفتاح الواحد:</span>
+                <span style={{ fontFamily: 'monospace' }}>${pricePerKey.toFixed(2)}</span>
               </div>
-              <div style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                marginTop: '8px',
-                fontSize: '16px',
-                fontWeight: 900,
-                color: '#66bb6a'
-              }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '8px', fontSize: '16px', fontWeight: 900, color: '#66bb6a' }}>
                 <span>الإجمالي:</span>
-                <span style={{ fontFamily: 'monospace' }}>
-                  ${totalCost.toFixed(2)}
-                </span>
+                <span style={{ fontFamily: 'monospace' }}>${totalCost.toFixed(2)}</span>
               </div>
             </div>
 
             {notEnough && (
-              <div style={{
-                background: 'rgba(229,115,115,0.15)',
-                border: '1px solid rgba(229,115,115,0.5)',
-                color: '#ef5350',
-                padding: '12px',
-                borderRadius: '10px',
-                marginBottom: '20px',
-                textAlign: 'center',
-                fontSize: '13px'
-              }}>
+              <div style={{ background: 'rgba(229,115,115,0.15)', border: '1px solid rgba(229,115,115,0.5)', color: '#ef5350', padding: '12px', borderRadius: '10px', marginBottom: '20px', textAlign: 'center', fontSize: '13px' }}>
                 ⚠️ رصيدك غير كافٍ ($ {balance.toFixed(2)}). تحتاج ${totalCost.toFixed(2)}
               </div>
             )}
 
-            <button
-              type="submit"
-              disabled={loading || notEnough}
-              style={{
-                width: '100%',
-                padding: '16px',
-                background: notEnough
-                  ? 'linear-gradient(135deg, #666, #888)'
-                  : 'linear-gradient(135deg, #d4af37, #f4d03f)',
-                color: notEnough ? '#333' : '#0a0a0a',
-                border: 'none',
-                borderRadius: '10px',
-                fontWeight: 900,
-                fontSize: '15px',
-                letterSpacing: '3px',
-                cursor: (loading || notEnough) ? 'not-allowed' : 'pointer',
-                opacity: loading ? 0.6 : 1
-              }}
-            >
-              {loading ? '... جاري الإنشاء' : (notEnough ? '❌ رصيدك غير كافٍ' : '✦ توليد المفاتيح ✦')}
+            <button type="submit" disabled={loading || notEnough} style={{ width: '100%', padding: '16px', background: notEnough ? 'linear-gradient(135deg, #666, #888)' : 'linear-gradient(135deg, #d4af37, #f4d03f)', color: notEnough ? '#333' : '#0a0a0a', border: 'none', borderRadius: '10px', fontWeight: 900, fontSize: '15px', letterSpacing: '3px', cursor: (loading || notEnough) ? 'not-allowed' : 'pointer', opacity: loading ? 0.6 : 1 }}>
+              {loading ? '... جاري الإنشاء' : (notEnough ? '❌ رصيدك غير كافٍ' : `✦ توليد ${genType === 'key' ? 'المفاتيح' : 'الحسابات'} ✦`)}
             </button>
           </form>
 
-          {keys.length > 0 && (
+          {/* عرض المفاتيح القديمة */}
+          {genType === 'key' && keys.length > 0 && (
             <div style={{ marginTop: '30px' }}>
-              <div style={{
-                background: 'rgba(76,175,80,0.15)',
-                border: '1px solid rgba(76,175,80,0.5)',
-                color: '#66bb6a',
-                padding: '12px',
-                borderRadius: '10px',
-                marginBottom: '15px',
-                textAlign: 'center'
-              }}>
+              <div style={{ background: 'rgba(76,175,80,0.15)', border: '1px solid rgba(76,175,80,0.5)', color: '#66bb6a', padding: '12px', borderRadius: '10px', marginBottom: '15px', textAlign: 'center' }}>
                 ✅ تم إنشاء {keys.length} مفتاح
-                {cost > 0 && (
-                  <div style={{ color: '#f4d03f', fontSize: '13px', marginTop: '5px' }}>
-                    💰 التكلفة: ${cost.toFixed(2)}
-                  </div>
-                )}
+                {cost > 0 && <div style={{ color: '#f4d03f', fontSize: '13px', marginTop: '5px' }}>💰 التكلفة: ${cost.toFixed(2)}</div>}
               </div>
-
-              <button
-                onClick={copyAll}
-                style={{
-                  width: '100%',
-                  padding: '12px',
-                  fontSize: '13px',
-                  marginBottom: '15px',
-                  background: 'transparent',
-                  color: '#d4af37',
-                  border: '1px solid rgba(212,175,55,0.6)',
-                  borderRadius: '10px',
-                  fontWeight: 700,
-                  cursor: 'pointer'
-                }}
-              >📋 نسخ كل المفاتيح</button>
-
-              <div style={{
-                background: '#000',
-                border: '1px dashed #d4af37',
-                borderRadius: '10px',
-                padding: '15px',
-                maxHeight: '400px',
-                overflowY: 'auto'
-              }}>
+              <button onClick={copyAll} style={{ width: '100%', padding: '12px', fontSize: '13px', marginBottom: '15px', background: 'transparent', color: '#d4af37', border: '1px solid rgba(212,175,55,0.6)', borderRadius: '10px', fontWeight: 700, cursor: 'pointer' }}>📋 نسخ كل المفاتيح</button>
+              <div style={{ background: '#000', border: '1px dashed #d4af37', borderRadius: '10px', padding: '15px', maxHeight: '400px', overflowY: 'auto' }}>
                 {keys.map((k, i) => (
-                  <div key={i} style={{
-                    padding: '10px',
-                    borderBottom: '1px solid rgba(212,175,55,0.2)',
-                    fontFamily: 'monospace',
-                    fontSize: '12px',
-                    color: '#f4d03f',
-                    textAlign: 'center'
-                  }}>
+                  <div key={i} style={{ padding: '10px', borderBottom: '1px solid rgba(212,175,55,0.2)', fontFamily: 'monospace', fontSize: '12px', color: '#f4d03f', textAlign: 'center' }}>
                     {i + 1}. {k}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* عرض الحسابات الجديدة (يوزر وباس) */}
+          {genType === 'account' && accounts.length > 0 && (
+            <div style={{ marginTop: '30px' }}>
+              <div style={{ background: 'rgba(76,175,80,0.15)', border: '1px solid rgba(76,175,80,0.5)', color: '#66bb6a', padding: '12px', borderRadius: '10px', marginBottom: '15px', textAlign: 'center' }}>
+                ✅ تم إنشاء {accounts.length} حساب
+                {cost > 0 && <div style={{ color: '#f4d03f', fontSize: '13px', marginTop: '5px' }}>💰 التكلفة: ${cost.toFixed(2)}</div>}
+              </div>
+              <button onClick={copyAll} style={{ width: '100%', padding: '12px', fontSize: '13px', marginBottom: '15px', background: 'transparent', color: '#d4af37', border: '1px solid rgba(212,175,55,0.6)', borderRadius: '10px', fontWeight: 700, cursor: 'pointer' }}>📋 نسخ كل الحسابات</button>
+              <div style={{ background: '#000', border: '1px dashed #d4af37', borderRadius: '10px', padding: '15px', maxHeight: '400px', overflowY: 'auto' }}>
+                {accounts.map((acc, i) => (
+                  <div key={i} style={{ padding: '10px', borderBottom: '1px solid rgba(212,175,55,0.2)', fontSize: '13px', textAlign: 'center' }}>
+                    <div style={{ color: '#888', marginBottom: '5px' }}>الحساب {i + 1}</div>
+                    <div style={{ color: '#f4d03f', fontFamily: 'monospace', marginBottom: '3px' }}>اليوزر: {acc.username}</div>
+                    <div style={{ color: '#66bb6a', fontFamily: 'monospace' }}>الباس: {acc.password}</div>
                   </div>
                 ))}
               </div>
@@ -412,40 +328,12 @@ export default function CreateKeyPage() {
 
         </div>
 
-        {/* Admin: Manage Prices */}
         {isAdmin && (
-          <div style={{
-            marginTop: '20px',
-            background: 'linear-gradient(145deg, #0f0f0f, #1a1a1a)',
-            border: '1px solid rgba(212,175,55,0.4)',
-            borderRadius: '16px',
-            padding: '20px',
-            textAlign: 'center'
-          }}>
-            <p style={{ color: '#999', fontSize: '13px', marginBottom: '15px' }}>
-              ⚙️ إدارة الأسعار (للأدمن)
-            </p>
+          <div style={{ marginTop: '20px', background: 'linear-gradient(145deg, #0f0f0f, #1a1a1a)', border: '1px solid rgba(212,175,55,0.4)', borderRadius: '16px', padding: '20px', textAlign: 'center' }}>
+            <p style={{ color: '#999', fontSize: '13px', marginBottom: '15px' }}>⚙️ إدارة الأسعار (للأدمن)</p>
             <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', flexWrap: 'wrap' }}>
-              <a href="/dashboard/admin/prices" style={{
-                padding: '10px 20px',
-                background: 'transparent',
-                color: '#d4af37',
-                border: '1px solid rgba(212,175,55,0.6)',
-                borderRadius: '10px',
-                textDecoration: 'none',
-                fontSize: '13px',
-                fontWeight: 700
-              }}>💵 أسعار الأنواع</a>
-              <a href="/dashboard/admin/device-prices" style={{
-                padding: '10px 20px',
-                background: 'transparent',
-                color: '#d4af37',
-                border: '1px solid rgba(212,175,55,0.6)',
-                borderRadius: '10px',
-                textDecoration: 'none',
-                fontSize: '13px',
-                fontWeight: 700
-              }}>💻 أسعار الأجهزة</a>
+              <a href="/dashboard/admin/prices" style={{ padding: '10px 20px', background: 'transparent', color: '#d4af37', border: '1px solid rgba(212,175,55,0.6)', borderRadius: '10px', textDecoration: 'none', fontSize: '13px', fontWeight: 700 }}>💵 أسعار الأنواع</a>
+              <a href="/dashboard/admin/device-prices" style={{ padding: '10px 20px', background: 'transparent', color: '#d4af37', border: '1px solid rgba(212,175,55,0.6)', borderRadius: '10px', textDecoration: 'none', fontSize: '13px', fontWeight: 700 }}>💻 أسعار الأجهزة</a>
             </div>
           </div>
         )}
